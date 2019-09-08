@@ -1,0 +1,52 @@
+{
+  "project_config": {
+    "alias": "test_project",
+    "prep_sub": "02PreparedData",
+    "analyses_sub": "03Analyses",
+    "fc_path": "",
+    "ep_path": "",
+    "number_of_cores": 4
+  },
+  "sonic_raw_convert_config": {
+    "alias": "Sonic",
+    "raw_files_directory": "D:\\Temp\\test_proj\\North\\01RawData\\Sonic",
+    "converted_files_directory": "D:\\Temp\\test_proj\\North\\02ConvertedData\\Sonic",
+    "raw_data_format": {
+      "header": 0,
+      "skiprows": [0, 2, 3],
+      "usecols": [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "na_values": "NAN",
+      "parse_dates": [0]
+    },
+    "raw_filenames_pattern": {
+      "file_init": "TOA5_12389.ts",
+      "file_ext": ".dat"
+    },
+    "data_periods_parameters": {
+      "start": "2018-05-31 18:30:00",
+      "end": "2018-07-02 08:15:00",
+      "freq": "15T"
+    }
+  },
+  "ammonia_raw_convert_config": {
+    "alias": "Ammonia",
+    "raw_files_directory": "D:\\Temp\\test_proj\\North\\01RawData\\Ammonia",
+    "converted_files_directory": "D:\\Temp\\test_proj\\North\\02ConvertedData\\Ammonia",
+    "raw_data_format": {
+      "sep": "\\s+",
+      "usecols": [0, 1, 17, 21],
+      "parse_dates": [[0, 1]]
+    },
+    "raw_filenames_pattern": {
+      "file_init": "AEDS2026",
+      "file_ext": ".dat"
+    },
+    "data_periods_parameters": {
+      "start": "2018-05-31 18:30:00",
+      "end": "2018-07-02 08:15:00",
+      "freq": "15T"
+    }
+  },
+  "fp_model_initiator_config": {},
+  "eddypro_proxy_config": {}
+}
