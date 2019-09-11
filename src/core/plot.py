@@ -1,5 +1,5 @@
 # coding=utf-8
-from tgadgets import file as fl
+from modules import file as fl
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
 import pandas as pd
@@ -39,7 +39,7 @@ class PlotData:
                  ):
         self.start_time = proj_periods['start']
         self.end_time = proj_periods['end']
-        self.data_path = fl.get_file(path=proj_path+analyses_sub, file_init='eddypro_ADV_full_output', file_ext='.csv')
+        self.data_path = fl.get_path(target_dir=proj_path+analyses_sub, file_init='eddypro_ADV_full_output', file_ext='.csv')
         self.plot_path = proj_path+analyses_sub+'\\Plots\\'
         self.plot_order = plot_order
         self.load_order = ['date', 'time'] + self.plot_order
