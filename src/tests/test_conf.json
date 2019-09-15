@@ -9,8 +9,8 @@
   },
   "sonic_raw_convert_config": {
     "alias": "Sonic",
-    "raw_files_directory": "D:\\Temp\\test_proj\\North\\01RawData\\Sonic",
-    "converted_files_directory": "D:\\Temp\\test_proj\\North\\02ConvertedData\\Sonic",
+    "raw_files_directory": "Z:\\Temp\\test_proj\\North\\01RawData\\Sonic",
+    "converted_files_directory": "Z:\\Temp\\test_proj\\North\\02ConvertedData\\Sonic",
     "raw_data_format": {
       "header": 0,
       "skiprows": [0, 2, 3],
@@ -30,8 +30,8 @@
   },
   "ammonia_raw_convert_config": {
     "alias": "Ammonia",
-    "raw_files_directory": "D:\\Temp\\test_proj\\North\\01RawData\\Ammonia",
-    "converted_files_directory": "D:\\Temp\\test_proj\\North\\02ConvertedData\\Ammonia",
+    "raw_files_directory": "Z:\\Temp\\test_proj\\North\\01RawData\\Ammonia",
+    "converted_files_directory": "Z:\\Temp\\test_proj\\North\\02ConvertedData\\Ammonia",
     "raw_data_format": {
       "sep": "\\s+",
       "usecols": [0, 1, 17, 21],

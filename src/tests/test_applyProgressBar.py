@@ -1,5 +1,5 @@
 from unittest import TestCase
-from modules.util import ApplyProgressBar
+from core.util import ApplyProgressBar
 from multiprocessing import Pool, freeze_support
 from time import sleep
 

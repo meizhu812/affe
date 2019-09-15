@@ -1,42 +1,43 @@
 import numpy as np
-from math import log, atan, pi
+from math import log
 from scipy.special import gamma
-from .functions import func_phi_m, func_phi_c, func_psi_m, kar
+from data.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
+
 
 footprint_grid = np.zeros((100, 100))
 n_x = n_y = 0
 x_max = y_max = f_max = 0
 
 
-class FPCalculator
-def calc_fp(z_m, z_0, date_time, wind_dir, wind_spd, sigma_v, u_star, L, h_s, rho_air):
-    if abs(L) < z_0:
-        L = (z_0 + 0.5) * np.sign(L)
+class FPCalculator:
+    def calc_fp(self, z_m, z_0, date_time, wind_dir, wind_spd, sigma_v, u_star, L, h_s, rho_air):
+        if abs(L) < z_0:
+            L = (z_0 + 0.5) * np.sign(L)
 
-    u = max(u_star / kar * (log(z_m / z_0)
-                            - func_psi_m(z_m / L)
-                            + func_psi_m(z_0 / L)),
-            u_star)
+        u = max(u_star / const_kar * (log(z_m / z_0)
+                                - func_psi_m(z_m / L)
+                                + func_psi_m(z_0 / L)),
+                u_star)
 
-    m = u_star / kar * func_phi_m(z_m / L) / u
+        m = u_star / const_kar * func_phi_m(z_m / L) / u
 
-    n = 1 / (1 + 5 * z_m / L) if L > 0 else (1 - 24 * z_m / L) / (1 - 16 * z_m / L)
+        n = 1 / (1 + 5 * z_m / L) if L > 0 else (1 - 24 * z_m / L) / (1 - 16 * z_m / L)
 
-    u_const = u / (z_m ** m)
+        u_const = u / (z_m ** m)
 
-    k_const = kar * u_star / func_phi_c(z_m / L) * (z_m ** (1 - n))
+        k_const = const_kar * u_star / func_phi_c(z_m / L) * (z_m ** (1 - n))
 
-    r = 2 + m - n
+        r = 2 + m - n
 
-    mu = (1 + m) / r
+        mu = (1 + m) / r
 
 
-    A = r * gamma(2 / r) / gamma(1 / r) ** 2
-    B =gamma(2 / r) / gamma(1 / r)
-    z_bar_cof = B * (r ** 2 * kar / u_const) ** (1 / r)
-    z_bar_exp = 1 / r
-    u_bar_cof = gamma(mu) / gamma(1 / r) * (r ** 2 * k_const / u_const) ** (m / r) * u_const
-    u_bar_exp = m / r
+        A = r * gamma(2 / r) / gamma(1 / r) ** 2
+        B =gamma(2 / r) / gamma(1 / r)
+        z_bar_cof = B * (r ** 2 * const_kar / u_const) ** (1 / r)
+        z_bar_exp = 1 / r
+        u_bar_cof = gamma(mu) / gamma(1 / r) * (r ** 2 * k_const / u_const) ** (m / r) * u_const
+        u_bar_exp = m / r
 
     def z_bar(x, B, r, k, U):
         return B * (x ** (1 / r))
@@ -67,7 +68,6 @@ def read_site_conf(site_param_path, site_locs_path):
     return z_m, z_0, x_max, y_max, dx, site_locs
 
 
-def
 
     if __name__ == '__main__':
         read_met_data(
