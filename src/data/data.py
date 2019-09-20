@@ -2,7 +2,6 @@
 doc
 """
 import os
-from core.frame import BaseProcessModule
 from itertools import islice
 from multiprocessing import Pool
 from collections import namedtuple
@@ -10,10 +9,21 @@ from collections import namedtuple
 import pandas as pd
 
 from core.file import get_path, get_paths
-from core.util import Console, ApplyProgressBar
+from core.util import Console, ProgressBar, Logger
 
 
-class RawConverter(BaseProcessModule):
+class BaseDataModule:
+    def __init__(self, prj_config: dict, mod_config: dict, logger: Logger):
+        self.n_cores = prj_config['physical_cores_available']
+        self._logger = logger
+        self._mod_config = mod_config
+        self._parse_config()
+
+    def _parse_config(self):
+        raise NotImplementedError
+
+
+class RawConverter(BaseDataModule):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -22,120 +32,130 @@ class RawConverter(BaseProcessModule):
         self.temp_data = None
 
     def _parse_config(self):
+        # the purpose of using namedtuple is to use '.' operator to access specific config item in a more intuitive way.
         rc_config = namedtuple('rc_config', ['raw_dir',
                                              'cvt_dir',
                                              'raw_format',
                                              'raw_pattern',
                                              'data_periods'])
-        self._config = rc_config(self._mod_config['raw_files_directory'],
-                                 self._mod_config['converted_files_directory'],
-                                 self._mod_config['raw_data_format'],
-                                 self._mod_config['raw_filenames_pattern'],
-                                 pd.date_range(**self._mod_config['data_periods_parameters']))
+        self.config = rc_config(self._mod_config['raw_files_directory'],
+                                self._mod_config['converted_files_directory'],
+                                self._mod_config['raw_data_format'],
+                                self._mod_config['raw_filenames_pattern'],
+                                pd.date_range(**self._mod_config['data_periods_parameters']))
 
     def load_raw_data(self):
-        file_paths = self._get_raw_paths(raw_dir=self._config.raw_dir, **self._config.raw_pattern)
-        raw_data_async = self._get_raw_data(file_paths, self._config.raw_format)
-        self.raw_data = self._merge_raw_data(raw_data_async)
+        @self._logger.log_process('Loading Raw Data', timed=False)
+        def process():
+            raw_paths = self._get_raw_paths(raw_dir=self.config.raw_dir, **self.config.raw_pattern)
+            raw_data_async = self._get_raw_data(raw_paths, self.config.raw_format)
+            print(len(raw_data_async))
+            self.raw_data = self._merge_raw_data(raw_data_async)
 
-    def _get_raw_paths(self, *args, **kwargs):
+        process()
+
+    def _get_raw_paths(self, *, raw_dir: str, file_init: str, file_ext: str):
         @self._logger.log_action('Getting raw data files', timed=False)
-        def action(*, raw_dir: str, file_init: str, file_ext: str):
-            Console.output("Listing files in folder: [{}]\n".format(raw_dir))
-            self._logger.log("[INIT]:'{}'\t".format(file_init) + "[EXT]:'{}'\n".format(file_ext))
+        def action():
+            self._logger.log("Listing files in folder: [{}]".format(raw_dir))
+            self._logger.log("[INIT]:'{}'\t".format(file_init) + "[EXT]:'{}'".format(file_ext))
 
             raw_paths = get_paths(target_dir=raw_dir, file_init=file_init, file_ext=file_ext)
 
             for raw_path in raw_paths[:3]:  # print heads
                 self._logger.log(raw_path)
-            self._logger.log(6 * '...')
+            self._logger.log(6 * '...' )
             for raw_path in raw_paths[-3:]:  # print tails
-                self._logger.log(raw_path)
+                self._logger.log(raw_path  )
 
-            self._logger.log('[ {} ] files found.\n'.format(len(raw_paths)))
-            self._logger.log('Check sequence of raw data files, press Enter to continue...\n')
+            self._logger.log('[ {} ] files found.'.format(len(raw_paths)))
+            self._logger.log('Check sequence of raw data files, press Enter to continue...')
             input()
             return raw_paths
 
-        return action(*args, **kwargs)
+        return action()
 
     def _get_raw_data(self, *args, **kwargs):
-        @self._logger.log_action('Getting [{}] data'.format('null'))
-        def action(raw_paths: list, raw_format):
-            params = [{'path': raw_path, 'raw_format': raw_format}
-                      for raw_path in raw_paths]
+        @self._logger.log_action('Getting [{}] data'.format('Raw'))
+        def action(raw_paths: list, raw_format: dict):
             with Pool(self.n_cores) as p:
                 self._logger.log("Reading with {} processes".format(self.n_cores))
-                raw_data_async = [p.apply_async(self._read_raw_file, (param,)) for param in params]
-                progress = ApplyProgressBar(apply_results=raw_data_async)
-                progress.track_progress()
+                pgb = ProgressBar(target=len(raw_paths))
+                raw_data_async = [p.apply_async(self._get_raw_data_sub, (raw_path, raw_format), callback=pgb.refresh)
+                                  for raw_path in raw_paths]
+                p.close()
+                p.join()
 
-            return raw_data_async
+                return raw_data_async
 
         return action(*args, **kwargs)
 
     @staticmethod
-    def _read_raw_file(param: dict) -> pd.DataFrame:
-        raw_datum = pd.read_csv(param['path'], **param['raw_format'])
+    def _get_raw_data_sub(raw_path, raw_format):
+        raw_datum = pd.read_csv(raw_path, **raw_format)  # raw_path and **raw_format
         raw_datum.set_index(raw_datum.columns[0], inplace=True)
         return raw_datum
 
-    def _merge_raw_data(self, *args, **kwargs):
+    def _merge_raw_data(self, raw_data_async):
         @self._logger.log_action('Merging [{}] data'.format('null'))
-        def action(raw_data_async):
+        def action():
             raw_data = pd.concat([raw_datum_async.get() for raw_datum_async in raw_data_async])
             return raw_data
 
-        return action(*args, **kwargs)
+        return action()
 
 
 class SonicRawConverter(RawConverter):
 
-    def prepare_sonic_data(self):
-        @self._logger.log_process('Splitting data for EddyPro input')
+    def convert_sonic_data(self):
+        @self._logger.log_process('Splitting data for EP input')
         def process():
-            data_and_range_fractions = self._make_data_fracs(self.raw_data, self._config.data_periods)
-            self._split_data_fracs_main(data_and_range_fractions)
+            data_and_period_fractions = self._make_fracs(self.raw_data, self.config.data_periods)
+            self._split_fracs(data_and_period_fractions)
 
         process()
 
-    def _split_data_fracs_main(self, data_and_range_fractions):
+    def _split_fracs(self, data_and_period_fracs):
         @self._logger.log_action('Splitting data fractions')
         def action():
-            with Pool(self.n_cores) as p:
-                split_path = self._config.cvt_dir
-                os.makedirs(split_path, exist_ok=True)
-                results = [p.apply_async(self._split_data_fractions_sub, (*data_and_range_fraction, split_path)) for
-                           data_and_range_fraction in data_and_range_fractions]
-                print('len:{}'.format(len(results)))
-                progress = ApplyProgressBar(apply_results=results)
-                progress.track_progress()
+            split_pool = Pool()
+            pgb = ProgressBar(target=len(data_and_period_fracs))
+            split_path = self.config.cvt_dir
+            os.makedirs(split_path, exist_ok=True)
+            [split_pool.apply_async(self._split_fracs_sub, (*data_and_range_frac, split_path), callback=pgb.refresh) for
+             data_and_range_frac in data_and_period_fracs]
+            split_pool.close()
+            split_pool.join()
 
         action()
 
-    def _make_data_fracs(self, data: pd.DataFrame, data_range):
+    def _make_fracs(self, data: pd.DataFrame, data_range):
         @self._logger.log_action('Making data fractions')
+        # the inner_action return a generator which needs to be converted into a list
         def action():
-            fraction_size, extra = divmod(len(data_range), self.n_cores * 8)
-            if extra:
-                fraction_size += 1
-            data_range_iter = iter(data_range)
-            while 1:
-                fraction = tuple(islice(data_range_iter, fraction_size))
-                if not fraction:
-                    return
-                start_time = fraction[0]
-                end_time = fraction[-1] + data_range.freq
-                data_range_fraction = pd.date_range(fraction[0], fraction[-1], freq=data_range.freq)
-                try:
-                    yield (data[start_time:end_time], data_range_fraction)
-                except Exception as e:
-                    print(e)
+            def inner_action():
+                fraction_size, extra = divmod(len(data_range), self.n_cores * 8)
+                if extra:
+                    fraction_size += 1
+                data_range_iter = iter(data_range)
+                while 1:
+                    fraction = tuple(islice(data_range_iter, fraction_size))
+                    if not fraction:
+                        return
+                    start_time = fraction[0]
+                    end_time = fraction[-1] + data_range.freq
+                    data_range_fraction = pd.date_range(fraction[0], fraction[-1], freq=data_range.freq)
+                    try:
+                        yield (data[start_time:end_time], data_range_fraction)
+                    except Exception as e:
+                        print(e, start_time)
+
+            return list(inner_action())
 
         return action()
 
     @staticmethod
-    def _split_data_fractions_sub(data_fraction: pd.DataFrame, data_range_fraction, split_path: str):
+    def _split_fracs_sub(data_fraction: pd.DataFrame, data_range_fraction, split_path: str):
         i = 0
         while i < len(data_range_fraction):
             start_time = data_range_fraction[i]
@@ -156,9 +176,9 @@ class AmmoniaRawConverter(RawConverter):
     def prepare_ammonia_data(self):
         print(">>> Averaging data")
         self.raw_data = self.raw_data.tshift(8, freq='H')  # Time Zone Change
-        data_prep = self.raw_data.resample(self._config.data_periods.freq).mean()
-        os.makedirs(self._config.cvt_dir, exist_ok=True)
-        data_prep.to_csv(self._config.cvt_dir + r'\data_averaged.csv')
+        data_prep = self.raw_data.resample(self.config.data_periods.freq).mean()
+        os.makedirs(self.config.cvt_dir, exist_ok=True)
+        data_prep.to_csv(self.config.cvt_dir + r'\data_averaged.csv')
         print("### Averaging data completed.")
 
 
@@ -239,7 +259,7 @@ class FpModelInitiator:
 
 
 class EPProxy:
-    def __init__(self):
+    def __init__(self, prj_conf, epp_conf):
         pass
 
     def modify_and_run(self):
@@ -256,6 +276,8 @@ class EPProxy:
     def _run_ep(self):
         pass
 
+
+"""
 class FluxEstimator(BaseProcessModule):
 
     def calc_emission(self):
@@ -294,5 +316,4 @@ class FluxEstimator(BaseProcessModule):
         # print(c_s)
         # print(c_n)
         print(sumup)
-
-
+        """

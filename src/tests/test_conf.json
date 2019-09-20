@@ -5,7 +5,7 @@
     "analyses_sub": "03Analyses",
     "fc_path": "",
     "ep_path": "",
-    "number_of_cores": 4
+    "physical_cores_available": 4
   },
   "sonic_raw_convert_config": {
     "alias": "Sonic",
@@ -47,6 +47,10 @@
       "freq": "15T"
     }
   },
-  "fp_model_initiator_config": {},
-  "eddypro_proxy_config": {}
+  "eddypro_proxy_config": {
+    "eddy_pro_cli_path": "",
+    "eddy_pro_metadata_path": "",
+    "eddy_pro_project_path": ""
+  },
+  "fp_model_initiator_config": {}
 }

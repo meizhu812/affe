@@ -9,8 +9,8 @@ class Console:
     A_FOOT = '{:0>2d}#'
 
     @staticmethod
-    def output(msg: str):
-        print(msg, flush=True, end='')
+    def output(msg: str, end='\n'):
+        print(msg, flush=True, end=end)
         return msg
 
     @staticmethod
@@ -20,37 +20,27 @@ class Console:
 
     @staticmethod
     def cl():
-        Console.output('\r{}\r'.format(80 * ' '))
+        Console.output('\r{}\r'.format(80 * ' '),end='')
 
 
-class ApplyProgressBar:
-
-    def __init__(self, *, apply_results: list):
+class ProgressBar:
+    def __init__(self, target):
         self._major_percentage = 0
-        self._results = apply_results
-        self._progress = 0
-        self._target = len(apply_results)
+        self._progress = -1
+        self._target = target
         print(self._target)
         self.start_time = time()
-        self.current_output = '[--------------------] ...starting...'
+        Console.output('[--------------------] ...starting...', end='')
 
-    def track_progress(self, t_refresh=0.1):
-        while self.percentage < 100:
-            self._refresh()
-            sleep(t_refresh)
-
-    def _refresh(self):
+    def refresh(self, result):
         self._update_progress()
         if self._major_advance:
             self._update_output()
-        Console.cl()
-        return Console.output(self.current_output)
+            Console.cl()
+            return Console.output(self.current_output, end='')
 
     def _update_progress(self):
-        self._progress = 0
-        for result in self._results:
-            if result.ready():
-                self._progress += 1
+        self._progress += 1
 
     def _update_output(self):
         self.current_output = self._bar_output() + self._percentage_output() + self._eta_output()
@@ -113,7 +103,7 @@ class Logger:
             def inner_wrapper(*args, **kwargs):
                 self._action_phase = 0
                 if self._process_phase == 0:
-                    self.log(strftime('[%Y-%m-%d %H:%M] Project Started!\n', localtime(time())))
+                    self.log(strftime('[%Y-%m-%d %H:%M] Project Started!', localtime(time())))
                 self._process_phase += 1
 
                 self.log(Logger.process_header(self._process_phase, process_name))
@@ -155,7 +145,7 @@ class Logger:
 
     @staticmethod
     def process_header(p_phase, p_name: str):
-        ph = '>>> [Process Started] <{0:0>2d}> {1}\n'.format(p_phase, p_name)
+        ph = '>>> [Process Started] <{0:0>2d}> {1}'.format(p_phase, p_name)
         # e.g. '>>> [Process Started] <02> Reading Data from Files'
         return ph
 
@@ -167,31 +157,31 @@ class Logger:
     @staticmethod
     def process_footer(p_phase, p_name: str, p_time=None):
         if p_time:
-            time_str = '[Process Time: {0} seconds.]\n'.format(str(round(p_time, 2)))
+            time_str = '[Process Time: {0} seconds.]'.format(str(round(p_time, 2)))
         else:
             time_str = ''
-        pf = '### [Process Finished] <{0:0>2d}> {1} {2}\n'.format(p_phase, p_name, time_str)
+        pf = '### [Process Finished] <{0:0>2d}> {1} {2}'.format(p_phase, p_name, time_str)
         # e.g. '### [Process Finished] <02> Reading Data from Files [Process Time: 19.93 seconds.]'
         return pf
 
     @staticmethod
     def action_header(a_phase, a_name: str):
-        ah = '{0:0>2d}> {1}\n'.format(a_phase, a_name)
+        ah = '{0:0>2d}> {1}'.format(a_phase, a_name)
         # e.g. '01> Loading files to memory [Started]'
         return ah
 
     @staticmethod
     def action_msg(msg: str):
-        am = '--- {}\n'.format(msg)
+        am = '--- {}'.format(msg)
         return am
 
     @staticmethod
     def action_footer(a_phase, a_name: str, a_time=None):
         if a_time:
-            time_str = '[Finished in {0} seconds]\n'.format(str(round(a_time, 2)))
+            time_str = '[Finished in {0} seconds]'.format(str(round(a_time, 2)))
         else:
-            time_str = '[Finished]\n'
-        af = '{0:0>2d}# {1} {2}\n'.format(a_phase, a_name, time_str)
+            time_str = '[Finished]'
+        af = '{0:0>2d}# {1} {2}'.format(a_phase, a_name, time_str)
         # e.g. '01# Loading files to memory [Finished in 8.12 seconds]'
         return af
 
