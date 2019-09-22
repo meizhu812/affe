@@ -55,7 +55,7 @@ class TestLogger(TestCase):
     def _timed_process(self):
         @self.logger.log_process('Timed Process')
         def process():
-            self.logger.process_msg('[Running dummy process for 2 seconds.]')
+            self.logger._process_msg('[Running dummy process for 2 seconds.]')
             sleep(2)
 
         process()
@@ -71,7 +71,7 @@ class TestLogger(TestCase):
     def _simple_action1(self):
         @self.logger.log_action('Simple Action I')
         def action():
-            self.logger.action_msg('[Running dummy action for 1 second.]')
+            self.logger._action_msg('[Running dummy action for 1 second.]')
             sleep(2)
 
         action()
@@ -79,7 +79,7 @@ class TestLogger(TestCase):
     def _simple_action2(self):
         @self.logger.log_action('Simple Action II')
         def action():
-            self.logger.action_msg('[Running dummy action for 1 second.]')
+            self.logger._action_msg('[Running dummy action for 1 second.]')
             sleep(2)
 
         action()

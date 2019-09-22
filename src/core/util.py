@@ -20,24 +20,29 @@ class Console:
 
     @staticmethod
     def cl():
-        Console.output('\r{}\r'.format(80 * ' '),end='')
+        Console.output('\r{}\r'.format(80 * ' '), end='')
+
+    @staticmethod
+    def blk(lines):
+        Console.output(lines * '\n', end='')
 
 
 class ProgressBar:
-    def __init__(self, target):
+    def __init__(self, target, interval=5):
         self._major_percentage = 0
-        self._progress = -1
+        self._progress = 0
         self._target = target
-        print(self._target)
+        self._interval = interval
+        self._t_last_refresh = time()
         self.start_time = time()
-        Console.output('[--------------------] ...starting...', end='')
+        Console.output('[--------------------]......starting...', end='')
 
-    def refresh(self, result):
+    def update(self, result=None):
         self._update_progress()
-        if self._major_advance:
+        if self._refresh_ready:
             self._update_output()
             Console.cl()
-            return Console.output(self.current_output, end='')
+            Console.output(self.current_output, end='')
 
     def _update_progress(self):
         self._progress += 1
@@ -46,28 +51,32 @@ class ProgressBar:
         self.current_output = self._bar_output() + self._percentage_output() + self._eta_output()
 
     def _bar_output(self):
-        n_blocks = int(self._major_percentage / 5)  # _major_percentage is int
+        n_blocks = int(self.percentage / 5)  # _major_percentage is int
         return '[{}{}]'.format(n_blocks * '+', (20 - n_blocks) * '-')  # e.g. '[++++++++++----------]'
 
     def _percentage_output(self):
-        return '%3i%%' % self._major_percentage
+        return '%3i%%' % self.percentage
 
     def _eta_output(self):
         if self.percentage == 100:
             return '...finished!\n'
         elif self.percentage >= 90:
             return '...almost done...'
-        else:
+        elif self.percentage >= 25:  # the eta becomes stable
             return '...%i seconds remaining...' % self.eta
+        else:
+            return '...please wait...'
 
     @property
     def percentage(self):
         return int(self._progress / self._target * 100)
 
     @property
-    def _major_advance(self):
-        if self.percentage - self._major_percentage >= 10:
-            self._major_percentage = self.percentage // 10 * 10
+    def _refresh_ready(self):
+        if self._progress == self._target:
+            return True
+        if time() - self._t_last_refresh >= self._interval:
+            self._t_last_refresh = time()
             return True
         else:
             return False
@@ -78,7 +87,8 @@ class ProgressBar:
 
     @property
     def eta(self):
-        return (time() - self.start_time) / self.percentage * (100 - self.percentage)
+        if self.percentage:
+            return (time() - self.start_time) / self.percentage * (100 - self.percentage)
 
 
 class Logger:
@@ -95,7 +105,7 @@ class Logger:
     def log(self, log_msg):
         if self._log_path:
             with open(self._log_path, 'a') as log_file:
-                log_file.write(log_msg)
+                log_file.write(strftime('[%Y-%m-%d %H:%M]', localtime(time())) + log_msg + '\n')
         Console.output(log_msg)
 
     def log_process(self, process_name, *, timed=True):
@@ -103,18 +113,20 @@ class Logger:
             def inner_wrapper(*args, **kwargs):
                 self._action_phase = 0
                 if self._process_phase == 0:
-                    self.log(strftime('[%Y-%m-%d %H:%M] Project Started!', localtime(time())))
+                    self.log('{0} Project Started! {0}'.format(20 * '*'))
                 self._process_phase += 1
 
-                self.log(Logger.process_header(self._process_phase, process_name))
+                self.log(Logger._process_header(self._process_phase, process_name))
                 start_time = time()
                 returned = process(*args, **kwargs)
                 run_time = time() - start_time
 
                 if timed:
-                    self.log(Logger.process_footer(self._process_phase, process_name, run_time))
+                    self.log(Logger._process_footer(self._process_phase, process_name, run_time))
                 else:
-                    self.log(Logger.process_footer(self._process_phase, process_name))
+                    self.log(Logger._process_footer(self._process_phase, process_name))
+
+                Console.blk(2)
 
                 return returned
 
@@ -127,15 +139,17 @@ class Logger:
             def inner_wrapper(*args, **kwargs):
                 self._action_phase += 1
 
-                self.log(Logger.action_header(self._action_phase, action_name))
+                self.log(Logger._action_header(self._action_phase, action_name))
                 start_time = time()
                 returned = action(*args, **kwargs)
                 run_time = time() - start_time
 
                 if timed:
-                    self.log(Logger.action_footer(self._action_phase, action_name, run_time))
+                    self.log(Logger._action_footer(self._action_phase, action_name, run_time))
                 else:
-                    self.log(Logger.action_footer(self._action_phase, action_name))
+                    self.log(Logger._action_footer(self._action_phase, action_name))
+
+                Console.blk(1)
 
                 return returned
 
@@ -144,18 +158,18 @@ class Logger:
         return wrapper
 
     @staticmethod
-    def process_header(p_phase, p_name: str):
+    def _process_header(p_phase, p_name: str):
         ph = '>>> [Process Started] <{0:0>2d}> {1}'.format(p_phase, p_name)
         # e.g. '>>> [Process Started] <02> Reading Data from Files'
         return ph
 
     @staticmethod
-    def process_msg(msg: str):
+    def _process_msg(msg: str):
         pm = '||| {}'.format(msg)
         return pm
 
     @staticmethod
-    def process_footer(p_phase, p_name: str, p_time=None):
+    def _process_footer(p_phase, p_name: str, p_time=None):
         if p_time:
             time_str = '[Process Time: {0} seconds.]'.format(str(round(p_time, 2)))
         else:
@@ -165,18 +179,18 @@ class Logger:
         return pf
 
     @staticmethod
-    def action_header(a_phase, a_name: str):
+    def _action_header(a_phase, a_name: str):
         ah = '{0:0>2d}> {1}'.format(a_phase, a_name)
         # e.g. '01> Loading files to memory [Started]'
         return ah
 
     @staticmethod
-    def action_msg(msg: str):
+    def _action_msg(msg: str):
         am = '--- {}'.format(msg)
         return am
 
     @staticmethod
-    def action_footer(a_phase, a_name: str, a_time=None):
+    def _action_footer(a_phase, a_name: str, a_time=None):
         if a_time:
             time_str = '[Finished in {0} seconds]'.format(str(round(a_time, 2)))
         else:

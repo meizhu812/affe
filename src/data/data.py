@@ -2,11 +2,15 @@
 doc
 """
 import os
+import subprocess
+import shutil as sh
+from time import sleep
 from itertools import islice
 from multiprocessing import Pool
 from collections import namedtuple
 
 import pandas as pd
+import configparser as cp
 
 from core.file import get_path, get_paths
 from core.util import Console, ProgressBar, Logger
@@ -64,9 +68,9 @@ class RawConverter(BaseDataModule):
 
             for raw_path in raw_paths[:3]:  # print heads
                 self._logger.log(raw_path)
-            self._logger.log(6 * '...' )
+            self._logger.log(6 * '...')
             for raw_path in raw_paths[-3:]:  # print tails
-                self._logger.log(raw_path  )
+                self._logger.log(raw_path)
 
             self._logger.log('[ {} ] files found.'.format(len(raw_paths)))
             self._logger.log('Check sequence of raw data files, press Enter to continue...')
@@ -81,7 +85,7 @@ class RawConverter(BaseDataModule):
             with Pool(self.n_cores) as p:
                 self._logger.log("Reading with {} processes".format(self.n_cores))
                 pgb = ProgressBar(target=len(raw_paths))
-                raw_data_async = [p.apply_async(self._get_raw_data_sub, (raw_path, raw_format), callback=pgb.refresh)
+                raw_data_async = [p.apply_async(self._get_raw_data_sub, (raw_path, raw_format), callback=pgb.update)
                                   for raw_path in raw_paths]
                 p.close()
                 p.join()
@@ -122,7 +126,7 @@ class SonicRawConverter(RawConverter):
             pgb = ProgressBar(target=len(data_and_period_fracs))
             split_path = self.config.cvt_dir
             os.makedirs(split_path, exist_ok=True)
-            [split_pool.apply_async(self._split_fracs_sub, (*data_and_range_frac, split_path), callback=pgb.refresh) for
+            [split_pool.apply_async(self._split_fracs_sub, (*data_and_range_frac, split_path), callback=pgb.update) for
              data_and_range_frac in data_and_period_fracs]
             split_pool.close()
             split_pool.join()
@@ -182,37 +186,71 @@ class AmmoniaRawConverter(RawConverter):
         print("### Averaging data completed.")
 
 
-class FpModelInitiator:
-    def __init__(self, config, logger):
-        self.config = config
-        self.logger = logger
+class FpGrdGenerator(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        self.output_dir = config['fp_dir']
-        self.eddy_results_dir = config['eddy_results_dir']
+    def _parse_config(self):
+        fmi_config = namedtuple('fmi_config', ['fpout_dir',
+                                               'epr_dir',
+                                               'cli_path',
+                                               'z_m',
+                                               'z_0',
+                                               'x_max',
+                                               'y_max',
+                                               'dx',
+                                               'loc_x',
+                                               'loc_y'])
+        self.config = fmi_config(self._mod_config['footprint_output_directory'],
+                                 self._mod_config['eddypro_results_directory'],
+                                 self._mod_config['footprint_model_cli_path'],
+                                 self._mod_config['measure_height'],
+                                 self._mod_config['roughness_height'],
+                                 self._mod_config['x_range'],
+                                 self._mod_config['y_range'],
+                                 self._mod_config['grid_size'],
+                                 self._mod_config['station_x'],
+                                 self._mod_config['station_y'])
 
-    def initialize_model(self):
-        self._write_model_params()
-        self._convert_met_data()
+    def initialize_and_run(self):
+        @self._logger.log_process('Generate Footprint Grid Files')
+        def process():
+            self._initialize_fp_model()
+            self._run_fp_model()
+
+        process()
+
+    def _initialize_fp_model(self):
+        @self._logger.log_action('Initializing Footprint Model Parameters')
+        def action():
+            self._write_model_params()
+            self._convert_met_data()
+
+        action()
 
     def _write_model_params(self):
-        z_m = self.config['measure_height']
-        z_0 = self.config['roughness_height']
-        x_max = self.config['x_range']
-        y_max = self.config['y_range']
-        dx = self.config['grid_size']
-        station_x = self.config['station_x']
-        station_y = self.config['station_y']
-
-        os.makedirs(self.output_dir, exist_ok=True)
-        with open(self.output_dir + '\\01paras.dat', mode='w') as param_file:
-            param_file.write('{:.1f},{:.2f}, `\n'.format(z_m, z_0))
-            param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(x_max, y_max, dx))
-            param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')
-        with open(self.output_dir + '\\monit.pst', mode='w') as station_file:
-            station_file.write('{:.3f},{:.3f},1# \n'.format(station_x, station_y))
+        raise NotImplementedError
 
     def _convert_met_data(self):
-        result_path = get_path(target_dir=self.eddy_results_dir,
+        raise NotImplementedError
+
+    def _run_fp_model(self):
+        raise NotImplementedError
+
+
+"""
+    def _write_model_params(self):
+        config = self.config  # for simplicity in lines below (over 10 usages)
+        os.makedirs(config.fpout_dir, exist_ok=True)
+        with open(config.fpout_dir + '\\01paras.dat', mode='w') as param_file:
+            param_file.write('{:.1f},{:.2f}, `\n'.format(config.z_m, config.z_0))
+            param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(config.x_max, config.y_max, config.dx))
+            param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')  # TODO may alter after checking
+        with open(config.fpout_dir + '\\monit.pst', mode='w') as station_file:
+            station_file.write('{:.3f},{:.3f},1# \n'.format(config.loc_x, config.loc_y))
+
+    def _convert_met_data(self):
+        result_path = get_path(target_dir=self.config.epr_dir,
                                file_init='eddypro_ADV_full_output',
                                file_ext='adv.csv')
         order = ['date',
@@ -251,30 +289,162 @@ class FpModelInitiator:
                     'rho(kg/m3)',
                     'key(1/0==use ustar & Obu_L /use H_sensible heat)']
         flux_out.columns = out_cols
-        flux_out.to_csv(self.output_dir + '\\02metdata.dat',
+        flux_out.to_csv(self.config.fpout_dir + '\\02metdata.dat',
                         date_format='%y%m%d%H%M',
                         index_label='Datetime',
                         sep='\t',
                         float_format='%.3f')
+"""
 
 
-class EPProxy:
-    def __init__(self, prj_conf, epp_conf):
-        pass
+class FpGrdGeneratorClassic(FpGrdGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.out_dirs = [self.config.fpout_dir + '\\proc{}'.format(n) for n in range(self.n_cores)]
+
+    def _write_model_params(self):
+        for n in range(self.n_cores):
+            os.makedirs(self.out_dirs[n], exist_ok=True)
+            with open(self.out_dirs[n] + '\\01paras.dat', mode='w') as param_file:
+                param_file.write('{:.1f},{:.2f}, `\n'.format(self.config.z_m, self.config.z_0))
+                param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(self.config.x_max, self.config.y_max, self.config.dx))
+                param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')  # TODO may alter after checking
+            with open(self.out_dirs[n] + '\\monit.pst', mode='w') as station_file:
+                station_file.write('{:.3f},{:.3f},1# \n'.format(self.config.loc_x, self.config.loc_y))
+
+    def _convert_met_data(self):
+        result_path = get_path(target_dir=self.config.epr_dir,
+                               file_init='eddypro_ADV_essentials',
+                               file_ext='adv.csv')
+        order = ['date',
+                 'time',
+                 'wind_dir',
+                 'wind_speed',
+                 'u*',
+                 'L',
+                 'H',
+                 'rho_air',
+                 'var(v)']
+        flux_full = pd.read_csv(result_path,
+                                usecols=order,
+                                parse_dates=[[0, 1]],
+                                na_values=-9999)
+        flux_full.set_index(flux_full.columns[0], inplace=True)
+        flux_full.dropna(inplace=True)
+        flux_full['key'] = 1
+        out_order = ['wind_dir',
+                     'wind_speed',
+                     'sigma_v',
+                     'u*',
+                     'L',
+                     'H',
+                     'rho_air',
+                     'key']
+        flux_full['sigma_v'] = flux_full['var(v)'] ** 0.5
+        flux_out = flux_full[out_order]
+        out_cols = ['wd(deg)',
+                    'U(m/s)',
+                    'Sgm_v',
+                    'u*(m/s)',
+                    'L(m)',
+                    'H(J/m2)',
+                    'rho(kg/m3)',
+                    'key(1/0==use ustar & Obu_L /use H_sensible heat)']
+        flux_out.columns = out_cols
+        self.total = len(flux_out)
+        seg = self.total // self.n_cores + 1
+        for n in range(self.n_cores):
+            nth_out = flux_out.iloc[n * seg: (n + 1) * seg]
+            nth_out.to_csv(self.out_dirs[n] + '\\02metdata.dat',
+                           date_format='%y%m%d%H%M',
+                           index_label='Datetime',
+                           sep='\t',
+                           float_format='%.3f')
+
+    def _run_fp_model(self):
+        @self._logger.log_action('Running Footprint Model in parallel')
+        def action():
+            fme_paths = [os.path.join(self.out_dirs[n], 'cftp{}.exe'.format(n)) for n in range(self.n_cores)]
+            processes = []
+            for fme_path in fme_paths:
+                sh.copyfile(self.config.cli_path, fme_path)
+                processes.append(subprocess.Popen(fme_path, cwd=os.path.split(fme_path)[0], stdout=subprocess.PIPE,
+                                                  stderr=subprocess.PIPE))
+            fme_pgb = ProgressBar(target=self.total)
+            while processes:
+                for n, process in enumerate(processes):
+                    output = process.stdout.readline().decode('utf8').strip()
+                    if output.startswith('ouput file'):
+                        fme_pgb.update()
+                    elif output.startswith('ok, please'):
+                        process.terminate()
+                        processes.pop(n)
+
+        action()
+
+    def _rearrange_and_cleanup(self):
+        @self._logger.log_action('Rearranging Footprint Grid Files and Cleaning up')
+        def action():
+            for out_dir in self.out_dirs:  # go though all sub-folders
+                grd_files = get_paths(target_dir=out_dir, file_ext='.grd')
+                for grd_file in grd_files:  # move all .grd files
+                    file_dir, file_name = os.path.split(grd_file)
+                    sh.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
+                sh.rmtree(out_dir)  # remove all sub-folders
+
+        action()
+
+
+class EPProxy(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.total_files = None
+
+    def _parse_config(self):
+        epp_config = namedtuple('epp_config',
+                                ['cli_path',
+                                 'prj_path'])
+        self.config = epp_config(self._mod_config['eddypro_cli_path'],
+                                 self._mod_config['eddypro_project_path'])
 
     def modify_and_run(self):
-        self._modify_metadata()
-        self._modify_ep_project()
-        self._run_ep()
+        @self._logger.log_process('Calculating Turbulence Statistics')
+        def process():
+            self._modify_ep_project()
+            self._run_ep()
+
+        process()
 
     def _modify_ep_project(self):
-        pass
+        @self._logger.log_action('Creating metadata and project configs', timed=False)
+        def action():
+            ep_config = cp.ConfigParser()
+            ep_config.read(self.config.prj_path)
+            self.total_files = len(os.listdir(ep_config.get('RawProcess_General', 'data_path')))
 
-    def _modify_metadata(self):
-        pass
+        action()
 
     def _run_ep(self):
-        pass
+        @self._logger.log_action('Running EddyPro in background')
+        def action():
+            process = subprocess.Popen([self.config.cli_path, self.config.prj_path], shell=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            ep_pgb = ProgressBar(target=self.total_files)
+            rp_ended = False
+
+            while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
+                output = process.stdout.readline().decode('utf8').strip()
+                if output.startswith('From:'):
+                    ep_pgb.update()
+                elif output.startswith('Raw data processing terminated.'):
+                    rp_ended = True
+                elif output.startswith('Done.') and rp_ended:
+                    process.terminate()  # manually kill the subprocess
+                    break
+
+        action()
 
 
 """

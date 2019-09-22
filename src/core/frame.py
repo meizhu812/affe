@@ -1,7 +1,7 @@
 from core.util import Logger
-from data.data import SonicRawConverter, AmmoniaRawConverter, FpModelInitiator, EPProxy
+from data.data import SonicRawConverter, AmmoniaRawConverter, FpGrdGeneratorClassic, EPProxy
 import json
-import pandas as pd
+
 
 
 class Project:
@@ -43,21 +43,20 @@ class Project:
             self.logger.log('Error occurred!' + str(e) + '\n')
 
     def prepare_raw_data(self):
-        @self.logger.log_process('Processing Raw Data')
-        def process():
-            sonic_raw_prep = SonicRawConverter(self.prj_conf, self.src_conf, self.logger)
-            sonic_raw_prep.load_raw_data()
-            sonic_raw_prep.convert_sonic_data()
-            ammonia_raw_prep = AmmoniaRawConverter(self.prj_conf, self.arc_conf, self.logger)
-            ammonia_raw_prep.load_raw_data()
-            ammonia_raw_prep.prepare_ammonia_data()
+        sonic_raw_prep = SonicRawConverter(self.prj_conf, self.src_conf, self.logger)
+        sonic_raw_prep.load_raw_data()
+        sonic_raw_prep.convert_sonic_data()
+        ammonia_raw_prep = AmmoniaRawConverter(self.prj_conf, self.arc_conf, self.logger)
+        ammonia_raw_prep.load_raw_data()
+        ammonia_raw_prep.prepare_ammonia_data()
 
-        process()
 
     def generate_turb_stats(self):
-        ep_proxy = EPProxy(self.prj_conf, self.epp_conf)
+        ep_proxy = EPProxy(self.prj_conf, self.epp_conf,self.logger)
         ep_proxy.modify_and_run()
 
-    def initialize_fp_model(self):
-        fp_init = FpModelInitiator(self.fmi_conf, self.logger)
-        fp_init.initialize_model()
+    def generate_fp_grds(self):
+        fp_init = FpGrdGeneratorClassic(self.prj_conf,self.fmi_conf, self.logger)
+        fp_init.initialize_and_run()
+        fp_init._rearrange_and_cleanup()
+

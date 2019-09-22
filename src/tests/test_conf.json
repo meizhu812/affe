@@ -9,8 +9,8 @@
   },
   "sonic_raw_convert_config": {
     "alias": "Sonic",
-    "raw_files_directory": "Z:\\Temp\\test_proj\\North\\01RawData\\Sonic",
-    "converted_files_directory": "Z:\\Temp\\test_proj\\North\\02ConvertedData\\Sonic",
+    "raw_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\01RawData\\Sonic",
+    "converted_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\02ConvertedData\\Sonic",
     "raw_data_format": {
       "header": 0,
       "skiprows": [0, 2, 3],
@@ -23,15 +23,15 @@
       "file_ext": ".dat"
     },
     "data_periods_parameters": {
-      "start": "2018-05-31 18:30:00",
-      "end": "2018-07-02 08:15:00",
+      "start": "2018-06-01 00:00:00",
+      "end": "2018-06-03 00:00:00",
       "freq": "15T"
     }
   },
   "ammonia_raw_convert_config": {
     "alias": "Ammonia",
-    "raw_files_directory": "Z:\\Temp\\test_proj\\North\\01RawData\\Ammonia",
-    "converted_files_directory": "Z:\\Temp\\test_proj\\North\\02ConvertedData\\Ammonia",
+    "raw_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\01RawData\\Ammonia",
+    "converted_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\02ConvertedData\\Ammonia",
     "raw_data_format": {
       "sep": "\\s+",
       "usecols": [0, 1, 17, 21],
@@ -42,15 +42,26 @@
       "file_ext": ".dat"
     },
     "data_periods_parameters": {
-      "start": "2018-05-31 18:30:00",
-      "end": "2018-07-02 08:15:00",
+      "start": "2018-06-01 00:00:00",
+      "end": "2018-06-03 00:00:00",
       "freq": "15T"
     }
   },
   "eddypro_proxy_config": {
-    "eddy_pro_cli_path": "",
-    "eddy_pro_metadata_path": "",
-    "eddy_pro_project_path": ""
+    "eddypro_cli_path": "C:\\Users\\mz\\Documents\\test_proj\\bin\\eddypro_rp.exe",
+    "eddypro_project_path": "C:\\Users\\mz\\Documents\\test_proj\\EPFile\\2016SH.eddypro"
   },
-  "fp_model_initiator_config": {}
+  "fp_model_initiator_config": {
+    "footprint_output_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\04FootprintData",
+    "eddypro_results_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\03EPOutput",
+    "footprint_model_cli_path": "C:\\Users\\mz\\Documents\\test_proj\\bin\\cftp.exe",
+    "measure_height": 8.2,
+    "roughness_height": 0.01,
+    "x_range": 750,
+    "y_range": 750,
+    "grid_size": 5,
+    "station_x": 0.240,
+    "station_y": 0.545
+
+  }
 }
