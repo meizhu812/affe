@@ -1,7 +1,7 @@
 from core.util import Logger
-from data.data import SonicRawConverter, AmmoniaRawConverter, FpGrdGeneratorClassic, EPProxy
+from modules.data import SonicRawConverter, AmmoniaRawConverter, FpGrdGeneratorClassic, EPProxy
+from modules.plot import Plotter
 import json
-
 
 
 class Project:
@@ -31,7 +31,8 @@ class Project:
             self.src_conf = self._configs['sonic_raw_convert_config']
             self.arc_conf = self._configs['ammonia_raw_convert_config']
             self.epp_conf = self._configs['eddypro_proxy_config']
-            self.fmi_conf = self._configs['fp_model_initiator_config']
+            self.fme_conf = self._configs['fp_model_executor_config']
+            self.tsp_conf = self._configs['timeseries_plotter_config']
         except Exception as e:
             self.logger.log('Error occurred!' + str(e))
 
@@ -50,13 +51,21 @@ class Project:
         ammonia_raw_prep.load_raw_data()
         ammonia_raw_prep.prepare_ammonia_data()
 
-
     def generate_turb_stats(self):
-        ep_proxy = EPProxy(self.prj_conf, self.epp_conf,self.logger)
+        ep_proxy = EPProxy(self.prj_conf, self.epp_conf, self.logger)
         ep_proxy.modify_and_run()
 
-    def generate_fp_grds(self):
-        fp_init = FpGrdGeneratorClassic(self.prj_conf,self.fmi_conf, self.logger)
-        fp_init.initialize_and_run()
-        fp_init._rearrange_and_cleanup()
+    def generate_fp_grds(self, method='classic'):
+        if method == 'classic':
+            fp_init = FpGrdGeneratorClassic(self.prj_conf, self.fme_conf, self.logger)
+            fp_init.initialize_and_run()
+        elif method == 'new':
+            pass  # TODO
+        else:
+            raise ValueError('Invalid method type')
+
+    def plot_timeseries(self):
+        ts_plotter = Plotter(self.prj_conf, self.tsp_conf, self.logger)
+        ts_plotter.plot_summary()
+
 

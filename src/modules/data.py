@@ -4,16 +4,17 @@ doc
 import os
 import subprocess
 import shutil as sh
-from time import sleep
 from itertools import islice
 from multiprocessing import Pool
 from collections import namedtuple
 
+import numpy as np
 import pandas as pd
 import configparser as cp
+import matplotlib.pyplot as plt
 
 from core.file import get_path, get_paths
-from core.util import Console, ProgressBar, Logger
+from core.util import ProgressBar, Logger
 
 
 class BaseDataModule:
@@ -59,7 +60,7 @@ class RawConverter(BaseDataModule):
         process()
 
     def _get_raw_paths(self, *, raw_dir: str, file_init: str, file_ext: str):
-        @self._logger.log_action('Getting raw data files', timed=False)
+        @self._logger.log_action('Getting raw modules files', timed=False)
         def action():
             self._logger.log("Listing files in folder: [{}]".format(raw_dir))
             self._logger.log("[INIT]:'{}'\t".format(file_init) + "[EXT]:'{}'".format(file_ext))
@@ -73,14 +74,14 @@ class RawConverter(BaseDataModule):
                 self._logger.log(raw_path)
 
             self._logger.log('[ {} ] files found.'.format(len(raw_paths)))
-            self._logger.log('Check sequence of raw data files, press Enter to continue...')
+            self._logger.log('Check sequence of raw modules files, press Enter to continue...')
             input()
             return raw_paths
 
         return action()
 
     def _get_raw_data(self, *args, **kwargs):
-        @self._logger.log_action('Getting [{}] data'.format('Raw'))
+        @self._logger.log_action('Getting [{}] modules'.format('Raw'))
         def action(raw_paths: list, raw_format: dict):
             with Pool(self.n_cores) as p:
                 self._logger.log("Reading with {} processes".format(self.n_cores))
@@ -101,7 +102,7 @@ class RawConverter(BaseDataModule):
         return raw_datum
 
     def _merge_raw_data(self, raw_data_async):
-        @self._logger.log_action('Merging [{}] data'.format('null'))
+        @self._logger.log_action('Merging [{}] modules'.format('null'))
         def action():
             raw_data = pd.concat([raw_datum_async.get() for raw_datum_async in raw_data_async])
             return raw_data
@@ -112,7 +113,7 @@ class RawConverter(BaseDataModule):
 class SonicRawConverter(RawConverter):
 
     def convert_sonic_data(self):
-        @self._logger.log_process('Splitting data for EP input')
+        @self._logger.log_process('Splitting modules for EP input')
         def process():
             data_and_period_fractions = self._make_fracs(self.raw_data, self.config.data_periods)
             self._split_fracs(data_and_period_fractions)
@@ -120,7 +121,7 @@ class SonicRawConverter(RawConverter):
         process()
 
     def _split_fracs(self, data_and_period_fracs):
-        @self._logger.log_action('Splitting data fractions')
+        @self._logger.log_action('Splitting modules fractions')
         def action():
             split_pool = Pool()
             pgb = ProgressBar(target=len(data_and_period_fracs))
@@ -134,7 +135,7 @@ class SonicRawConverter(RawConverter):
         action()
 
     def _make_fracs(self, data: pd.DataFrame, data_range):
-        @self._logger.log_action('Making data fractions')
+        @self._logger.log_action('Making modules fractions')
         # the inner_action return a generator which needs to be converted into a list
         def action():
             def inner_action():
@@ -178,222 +179,12 @@ class SonicRawConverter(RawConverter):
 
 class AmmoniaRawConverter(RawConverter):
     def prepare_ammonia_data(self):
-        print(">>> Averaging data")
+        print(">>> Averaging modules")
         self.raw_data = self.raw_data.tshift(8, freq='H')  # Time Zone Change
         data_prep = self.raw_data.resample(self.config.data_periods.freq).mean()
         os.makedirs(self.config.cvt_dir, exist_ok=True)
         data_prep.to_csv(self.config.cvt_dir + r'\data_averaged.csv')
-        print("### Averaging data completed.")
-
-
-class FpGrdGenerator(BaseDataModule):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def _parse_config(self):
-        fmi_config = namedtuple('fmi_config', ['fpout_dir',
-                                               'epr_dir',
-                                               'cli_path',
-                                               'z_m',
-                                               'z_0',
-                                               'x_max',
-                                               'y_max',
-                                               'dx',
-                                               'loc_x',
-                                               'loc_y'])
-        self.config = fmi_config(self._mod_config['footprint_output_directory'],
-                                 self._mod_config['eddypro_results_directory'],
-                                 self._mod_config['footprint_model_cli_path'],
-                                 self._mod_config['measure_height'],
-                                 self._mod_config['roughness_height'],
-                                 self._mod_config['x_range'],
-                                 self._mod_config['y_range'],
-                                 self._mod_config['grid_size'],
-                                 self._mod_config['station_x'],
-                                 self._mod_config['station_y'])
-
-    def initialize_and_run(self):
-        @self._logger.log_process('Generate Footprint Grid Files')
-        def process():
-            self._initialize_fp_model()
-            self._run_fp_model()
-
-        process()
-
-    def _initialize_fp_model(self):
-        @self._logger.log_action('Initializing Footprint Model Parameters')
-        def action():
-            self._write_model_params()
-            self._convert_met_data()
-
-        action()
-
-    def _write_model_params(self):
-        raise NotImplementedError
-
-    def _convert_met_data(self):
-        raise NotImplementedError
-
-    def _run_fp_model(self):
-        raise NotImplementedError
-
-
-"""
-    def _write_model_params(self):
-        config = self.config  # for simplicity in lines below (over 10 usages)
-        os.makedirs(config.fpout_dir, exist_ok=True)
-        with open(config.fpout_dir + '\\01paras.dat', mode='w') as param_file:
-            param_file.write('{:.1f},{:.2f}, `\n'.format(config.z_m, config.z_0))
-            param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(config.x_max, config.y_max, config.dx))
-            param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')  # TODO may alter after checking
-        with open(config.fpout_dir + '\\monit.pst', mode='w') as station_file:
-            station_file.write('{:.3f},{:.3f},1# \n'.format(config.loc_x, config.loc_y))
-
-    def _convert_met_data(self):
-        result_path = get_path(target_dir=self.config.epr_dir,
-                               file_init='eddypro_ADV_full_output',
-                               file_ext='adv.csv')
-        order = ['date',
-                 'time',
-                 'wind_dir',
-                 'wind_speed',
-                 'u*',
-                 'L',
-                 'H',
-                 'air_density',
-                 'v_var']
-        flux_full = pd.read_csv(result_path,
-                                skiprows=[0, 2],
-                                usecols=order,
-                                parse_dates=[[0, 1]],
-                                na_values=-9999)
-        flux_full.set_index(flux_full.columns[0], inplace=True)
-        flux_full.dropna(inplace=True)
-        flux_full['key'] = 1
-        out_order = ['wind_dir',
-                     'wind_speed',
-                     'sigma_v',
-                     'u*',
-                     'L',
-                     'H',
-                     'air_density',
-                     'key']
-        flux_full['sigma_v'] = flux_full['v_var'] ** 0.5
-        flux_out = flux_full[out_order]
-        out_cols = ['wd(deg)',
-                    'U(m/s)',
-                    'Sgm_v',
-                    'u*(m/s)',
-                    'L(m)',
-                    'H(J/m2)',
-                    'rho(kg/m3)',
-                    'key(1/0==use ustar & Obu_L /use H_sensible heat)']
-        flux_out.columns = out_cols
-        flux_out.to_csv(self.config.fpout_dir + '\\02metdata.dat',
-                        date_format='%y%m%d%H%M',
-                        index_label='Datetime',
-                        sep='\t',
-                        float_format='%.3f')
-"""
-
-
-class FpGrdGeneratorClassic(FpGrdGenerator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.out_dirs = [self.config.fpout_dir + '\\proc{}'.format(n) for n in range(self.n_cores)]
-
-    def _write_model_params(self):
-        for n in range(self.n_cores):
-            os.makedirs(self.out_dirs[n], exist_ok=True)
-            with open(self.out_dirs[n] + '\\01paras.dat', mode='w') as param_file:
-                param_file.write('{:.1f},{:.2f}, `\n'.format(self.config.z_m, self.config.z_0))
-                param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(self.config.x_max, self.config.y_max, self.config.dx))
-                param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')  # TODO may alter after checking
-            with open(self.out_dirs[n] + '\\monit.pst', mode='w') as station_file:
-                station_file.write('{:.3f},{:.3f},1# \n'.format(self.config.loc_x, self.config.loc_y))
-
-    def _convert_met_data(self):
-        result_path = get_path(target_dir=self.config.epr_dir,
-                               file_init='eddypro_ADV_essentials',
-                               file_ext='adv.csv')
-        order = ['date',
-                 'time',
-                 'wind_dir',
-                 'wind_speed',
-                 'u*',
-                 'L',
-                 'H',
-                 'rho_air',
-                 'var(v)']
-        flux_full = pd.read_csv(result_path,
-                                usecols=order,
-                                parse_dates=[[0, 1]],
-                                na_values=-9999)
-        flux_full.set_index(flux_full.columns[0], inplace=True)
-        flux_full.dropna(inplace=True)
-        flux_full['key'] = 1
-        out_order = ['wind_dir',
-                     'wind_speed',
-                     'sigma_v',
-                     'u*',
-                     'L',
-                     'H',
-                     'rho_air',
-                     'key']
-        flux_full['sigma_v'] = flux_full['var(v)'] ** 0.5
-        flux_out = flux_full[out_order]
-        out_cols = ['wd(deg)',
-                    'U(m/s)',
-                    'Sgm_v',
-                    'u*(m/s)',
-                    'L(m)',
-                    'H(J/m2)',
-                    'rho(kg/m3)',
-                    'key(1/0==use ustar & Obu_L /use H_sensible heat)']
-        flux_out.columns = out_cols
-        self.total = len(flux_out)
-        seg = self.total // self.n_cores + 1
-        for n in range(self.n_cores):
-            nth_out = flux_out.iloc[n * seg: (n + 1) * seg]
-            nth_out.to_csv(self.out_dirs[n] + '\\02metdata.dat',
-                           date_format='%y%m%d%H%M',
-                           index_label='Datetime',
-                           sep='\t',
-                           float_format='%.3f')
-
-    def _run_fp_model(self):
-        @self._logger.log_action('Running Footprint Model in parallel')
-        def action():
-            fme_paths = [os.path.join(self.out_dirs[n], 'cftp{}.exe'.format(n)) for n in range(self.n_cores)]
-            processes = []
-            for fme_path in fme_paths:
-                sh.copyfile(self.config.cli_path, fme_path)
-                processes.append(subprocess.Popen(fme_path, cwd=os.path.split(fme_path)[0], stdout=subprocess.PIPE,
-                                                  stderr=subprocess.PIPE))
-            fme_pgb = ProgressBar(target=self.total)
-            while processes:
-                for n, process in enumerate(processes):
-                    output = process.stdout.readline().decode('utf8').strip()
-                    if output.startswith('ouput file'):
-                        fme_pgb.update()
-                    elif output.startswith('ok, please'):
-                        process.terminate()
-                        processes.pop(n)
-
-        action()
-
-    def _rearrange_and_cleanup(self):
-        @self._logger.log_action('Rearranging Footprint Grid Files and Cleaning up')
-        def action():
-            for out_dir in self.out_dirs:  # go though all sub-folders
-                grd_files = get_paths(target_dir=out_dir, file_ext='.grd')
-                for grd_file in grd_files:  # move all .grd files
-                    file_dir, file_name = os.path.split(grd_file)
-                    sh.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
-                sh.rmtree(out_dir)  # remove all sub-folders
-
-        action()
+        print("### Averaging modules completed.")
 
 
 class EPProxy(BaseDataModule):
@@ -438,13 +229,179 @@ class EPProxy(BaseDataModule):
                 output = process.stdout.readline().decode('utf8').strip()
                 if output.startswith('From:'):
                     ep_pgb.update()
-                elif output.startswith('Raw data processing terminated.'):
+                elif output.startswith('Raw modules processing terminated.'):
                     rp_ended = True
                 elif output.startswith('Done.') and rp_ended:
                     process.terminate()  # manually kill the subprocess
                     break
 
         action()
+
+
+class FpGrdGenerator(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _parse_config(self):
+        fmi_config = namedtuple('fmi_config', ['fpout_dir',
+                                               'epr_dir',
+                                               'cli_path',
+                                               'z_m',
+                                               'z_0',
+                                               'x_max',
+                                               'y_max',
+                                               'dx',
+                                               'loc_x',
+                                               'loc_y'])
+        self.config = fmi_config(self._mod_config['footprint_output_directory'],
+                                 self._mod_config['eddypro_results_directory'],
+                                 self._mod_config['footprint_model_cli_path'],
+                                 self._mod_config['measure_height'],
+                                 self._mod_config['roughness_height'],
+                                 self._mod_config['x_range'],
+                                 self._mod_config['y_range'],
+                                 self._mod_config['grid_size'],
+                                 self._mod_config['station_x'],
+                                 self._mod_config['station_y'])
+
+    def initialize_and_run(self):
+        @self._logger.log_process('Generate Footprint Grid Files')
+        def process():
+            self._initialize_fp_model()
+            self._run_fp_model()
+
+        process()
+
+    def _initialize_fp_model(self):
+        raise NotImplementedError
+
+    def _run_fp_model(self):
+        raise NotImplementedError
+
+
+class FpGrdGeneratorClassic(FpGrdGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.out_dirs = [self.config.fpout_dir + '\\proc{}'.format(n) for n in range(self.n_cores)]
+
+    def _initialize_fp_model(self):
+        @self._logger.log_action('Initializing Footprint Model Parameters')
+        def action():
+            self._write_model_params()
+            self._convert_met_data()
+            self._run_fp_model()
+            self._rearrange_and_cleanup()
+
+        action()
+
+    def _write_model_params(self):
+        for n in range(self.n_cores):
+            os.makedirs(self.out_dirs[n], exist_ok=True)
+            with open(self.out_dirs[n] + '\\01paras.dat', mode='w') as param_file:
+                param_file.write('{:.1f},{:.2f}, `\n'.format(self.config.z_m, self.config.z_0))
+                param_file.write('{:.1f},{:.1f},{:d}, `\n'.format(self.config.x_max, self.config.y_max, self.config.dx))
+                param_file.write('100,100,100,100, `\n880e-9, `\n0.145, `\n')  # TODO may alter after checking
+            with open(self.out_dirs[n] + '\\monit.pst', mode='w') as station_file:
+                station_file.write('{:.3f},{:.3f},1# \n'.format(self.config.loc_x, self.config.loc_y))
+
+    def _convert_met_data(self):
+        result_path = get_path(target_dir=self.config.epr_dir,
+                               file_init='eddypro_ADV_essentials',
+                               file_ext='adv.csv')
+        order = ['date',
+                 'time',
+                 'wind_dir',
+                 'wind_speed',
+                 'u*',
+                 'L',
+                 'H',
+                 'rho_air',
+                 'var(v)']
+        flux_full = pd.read_csv(result_path,
+                                usecols=order,
+                                parse_dates=[[0, 1]],
+                                na_values=-9999)
+        flux_full.set_index(flux_full.columns[0], inplace=True)
+        flux_full.dropna(inplace=True)
+        flux_full['key'] = 1
+        out_order = ['wind_dir', 'wind_speed', 'sigma_v', 'u*', 'L', 'H', 'rho_air',
+                     'key']
+        flux_full['sigma_v'] = flux_full['var(v)'] ** 0.5
+        flux_out = flux_full[out_order]
+        out_cols = ['wd(deg)', 'U(m/s)', 'Sgm_v', 'u*(m/s)', 'L(m)', 'H(J/m2)', 'rho(kg/m3)',
+                    'key(1/0==use ustar & Obu_L /use H_sensible heat)']
+        flux_out.columns = out_cols
+        self.total = len(flux_out)
+        seg = self.total // self.n_cores + 1
+        for n in range(self.n_cores):
+            nth_out = flux_out.iloc[n * seg: (n + 1) * seg]
+            nth_out.to_csv(self.out_dirs[n] + '\\02metdata.dat',
+                           date_format='%y%m%d%H%M',
+                           index_label='Datetime',
+                           sep='\t',
+                           float_format='%.3f')
+
+    def _run_fp_model(self):
+        @self._logger.log_action('Running Footprint Model in parallel')
+        def action():
+            fme_paths = [os.path.join(self.out_dirs[n], 'cftp{}.exe'.format(n)) for n in range(self.n_cores)]
+            processes = []
+            for fme_path in fme_paths:
+                sh.copyfile(self.config.cli_path, fme_path)
+                processes.append(subprocess.Popen(fme_path, cwd=os.path.split(fme_path)[0], stdout=subprocess.PIPE,
+                                                  stderr=subprocess.PIPE))
+            fme_pgb = ProgressBar(target=self.total)
+            while processes:
+                for n, process in enumerate(processes):
+                    output = process.stdout.readline().decode('utf8').strip()
+                    if output.startswith('ouput file'):
+                        fme_pgb.update()
+                    elif output.startswith('ok, please'):
+                        process.terminate()
+                        processes.pop(n)
+
+        action()
+
+    def _rearrange_and_cleanup(self):
+        @self._logger.log_action('Rearranging Footprint Grid Files and Cleaning up')
+        def action():
+            for out_dir in self.out_dirs:  # go though all sub-folders
+                grd_files = get_paths(target_dir=out_dir, file_ext='.grd')
+                for grd_file in grd_files:  # move all .grd files
+                    file_dir, file_name = os.path.split(grd_file)
+                    sh.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
+                sh.rmtree(out_dir)  # remove all sub-folders and containing temp files
+
+        action()
+
+
+class FpGrdProcessor(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _parse_config(self):
+        pass
+
+    @staticmethod
+    def _get_grd_data(grd_path):
+        with open(grd_path, 'r') as f:
+            heads = []  # first 5 lines of grd file
+            for n in range(5):
+                heads.append(f.readline())
+            nx, ny = map(int, heads[1].split())
+            data_fracs = []
+            while True:
+                line = f.readline()
+                if not line:  # end of file
+                    break
+                data_fracs.append(np.fromstring(line, sep=' ', dtype='f4'))
+        return np.concatenate(data_fracs).reshape(nx,ny)
+
+    @staticmethod
+    def _plot_grd(grd_data,grd_path):
+        plt.contourf(grd_data)
+        plt.savefig(os.path.splitext(grd_path)[0]+'.png',dpi=300)
 
 
 """
