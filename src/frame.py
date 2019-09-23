@@ -1,6 +1,5 @@
-from core.util import Logger
-from modules.data import SonicRawConverter, AmmoniaRawConverter, FpGrdGeneratorClassic, EPProxy
-from modules.plot import Plotter
+from util import Logger
+from modules import SonicRawConverter, AmmoniaRawConverter, EPProxy, FpGrdGeneratorClassic, Plotter
 import json
 
 

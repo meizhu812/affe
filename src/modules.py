@@ -1,20 +1,18 @@
-"""
-doc
-"""
+import configparser
+import datetime
 import os
+import shutil
 import subprocess
-import shutil as sh
+from collections import namedtuple
 from itertools import islice
 from multiprocessing import Pool
-from collections import namedtuple
 
 import numpy as np
 import pandas as pd
-import configparser as cp
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt, dates as dates
 
-from core.file import get_path, get_paths
-from core.util import ProgressBar, Logger
+from file import get_paths, get_path
+from util import ProgressBar, Logger
 
 
 class BaseDataModule:
@@ -60,7 +58,7 @@ class RawConverter(BaseDataModule):
         process()
 
     def _get_raw_paths(self, *, raw_dir: str, file_init: str, file_ext: str):
-        @self._logger.log_action('Getting raw modules files', timed=False)
+        @self._logger.log_action('Getting raw moduless files', timed=False)
         def action():
             self._logger.log("Listing files in folder: [{}]".format(raw_dir))
             self._logger.log("[INIT]:'{}'\t".format(file_init) + "[EXT]:'{}'".format(file_ext))
@@ -74,14 +72,14 @@ class RawConverter(BaseDataModule):
                 self._logger.log(raw_path)
 
             self._logger.log('[ {} ] files found.'.format(len(raw_paths)))
-            self._logger.log('Check sequence of raw modules files, press Enter to continue...')
+            self._logger.log('Check sequence of raw moduless files, press Enter to continue...')
             input()
             return raw_paths
 
         return action()
 
     def _get_raw_data(self, *args, **kwargs):
-        @self._logger.log_action('Getting [{}] modules'.format('Raw'))
+        @self._logger.log_action('Getting [{}] moduless'.format('Raw'))
         def action(raw_paths: list, raw_format: dict):
             with Pool(self.n_cores) as p:
                 self._logger.log("Reading with {} processes".format(self.n_cores))
@@ -102,7 +100,7 @@ class RawConverter(BaseDataModule):
         return raw_datum
 
     def _merge_raw_data(self, raw_data_async):
-        @self._logger.log_action('Merging [{}] modules'.format('null'))
+        @self._logger.log_action('Merging [{}] moduless'.format('null'))
         def action():
             raw_data = pd.concat([raw_datum_async.get() for raw_datum_async in raw_data_async])
             return raw_data
@@ -113,7 +111,7 @@ class RawConverter(BaseDataModule):
 class SonicRawConverter(RawConverter):
 
     def convert_sonic_data(self):
-        @self._logger.log_process('Splitting modules for EP input')
+        @self._logger.log_process('Splitting moduless for EP input')
         def process():
             data_and_period_fractions = self._make_fracs(self.raw_data, self.config.data_periods)
             self._split_fracs(data_and_period_fractions)
@@ -121,7 +119,7 @@ class SonicRawConverter(RawConverter):
         process()
 
     def _split_fracs(self, data_and_period_fracs):
-        @self._logger.log_action('Splitting modules fractions')
+        @self._logger.log_action('Splitting moduless fractions')
         def action():
             split_pool = Pool()
             pgb = ProgressBar(target=len(data_and_period_fracs))
@@ -135,7 +133,7 @@ class SonicRawConverter(RawConverter):
         action()
 
     def _make_fracs(self, data: pd.DataFrame, data_range):
-        @self._logger.log_action('Making modules fractions')
+        @self._logger.log_action('Making moduless fractions')
         # the inner_action return a generator which needs to be converted into a list
         def action():
             def inner_action():
@@ -179,12 +177,12 @@ class SonicRawConverter(RawConverter):
 
 class AmmoniaRawConverter(RawConverter):
     def prepare_ammonia_data(self):
-        print(">>> Averaging modules")
+        print(">>> Averaging moduless")
         self.raw_data = self.raw_data.tshift(8, freq='H')  # Time Zone Change
         data_prep = self.raw_data.resample(self.config.data_periods.freq).mean()
         os.makedirs(self.config.cvt_dir, exist_ok=True)
         data_prep.to_csv(self.config.cvt_dir + r'\data_averaged.csv')
-        print("### Averaging modules completed.")
+        print("### Averaging moduless completed.")
 
 
 class EPProxy(BaseDataModule):
@@ -211,7 +209,7 @@ class EPProxy(BaseDataModule):
     def _modify_ep_project(self):
         @self._logger.log_action('Creating metadata and project configs', timed=False)
         def action():
-            ep_config = cp.ConfigParser()
+            ep_config = configparser.ConfigParser()
             ep_config.read(self.config.prj_path)
             self.total_files = len(os.listdir(ep_config.get('RawProcess_General', 'data_path')))
 
@@ -229,7 +227,7 @@ class EPProxy(BaseDataModule):
                 output = process.stdout.readline().decode('utf8').strip()
                 if output.startswith('From:'):
                     ep_pgb.update()
-                elif output.startswith('Raw modules processing terminated.'):
+                elif output.startswith('Raw moduless processing terminated.'):
                     rp_ended = True
                 elif output.startswith('Done.') and rp_ended:
                     process.terminate()  # manually kill the subprocess
@@ -348,7 +346,7 @@ class FpGrdGeneratorClassic(FpGrdGenerator):
             fme_paths = [os.path.join(self.out_dirs[n], 'cftp{}.exe'.format(n)) for n in range(self.n_cores)]
             processes = []
             for fme_path in fme_paths:
-                sh.copyfile(self.config.cli_path, fme_path)
+                shutil.copyfile(self.config.cli_path, fme_path)
                 processes.append(subprocess.Popen(fme_path, cwd=os.path.split(fme_path)[0], stdout=subprocess.PIPE,
                                                   stderr=subprocess.PIPE))
             fme_pgb = ProgressBar(target=self.total)
@@ -370,8 +368,8 @@ class FpGrdGeneratorClassic(FpGrdGenerator):
                 grd_files = get_paths(target_dir=out_dir, file_ext='.grd')
                 for grd_file in grd_files:  # move all .grd files
                     file_dir, file_name = os.path.split(grd_file)
-                    sh.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
-                sh.rmtree(out_dir)  # remove all sub-folders and containing temp files
+                    shutil.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
+                shutil.rmtree(out_dir)  # remove all sub-folders and containing temp files
 
         action()
 
@@ -396,51 +394,122 @@ class FpGrdProcessor(BaseDataModule):
                 if not line:  # end of file
                     break
                 data_fracs.append(np.fromstring(line, sep=' ', dtype='f4'))
-        return np.concatenate(data_fracs).reshape(nx,ny)
+        return np.concatenate(data_fracs).reshape(nx, ny)
 
     @staticmethod
-    def _plot_grd(grd_data,grd_path):
+    def _plot_grd(grd_data, grd_path):
         plt.contourf(grd_data)
-        plt.savefig(os.path.splitext(grd_path)[0]+'.png',dpi=300)
+        plt.savefig(os.path.splitext(grd_path)[0] + '.png', dpi=300)
 
 
-"""
-class FluxEstimator(BaseProcessModule):
+class Plotter(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def calc_emission(self):
-        DATA_PATH = r'd:\Desktop\present_work\01_ammonia\02_prelim\03_Summer2018\02_source'
-        FC_SUM = DATA_PATH + r'\fc_sum.csv'
-        C_N = DATA_PATH + r'\c_n.csv'
-        C_S = DATA_PATH + r'\c_s.csv'
-        SUM_UP = DATA_PATH + r'\sum_up.csv'
-        dateparse = lambda dates: pd.datetime.strptime(dates[0:10], '%y%m%d%H%M')
-        order_f = [' Datetm', ' Site_no', ' Fcsum(s/m)', ' Ratio(%)']  # todo
-        order_c = ['DATE_TIME', 'NH3_Raw']
-        fc_sum = pd.read_csv(FC_SUM, usecols=order_f, na_values=-9999, parse_dates=[0], date_parser=dateparse)
-        fc_sum.set_index(fc_sum.columns[0], inplace=True)
-        fc_n = fc_sum[fc_sum[' Site_no'] == '#1']
-        fc_s = fc_sum[fc_sum[' Site_no'] == '#2']
-        fc_n.drop(columns=[' Site_no'], inplace=True)
-        fc_s.drop(columns=[' Site_no'], inplace=True)
-        fc_n.columns = ['Fc_n', 'R_n']
-        fc_s.columns = ['Fc_s', 'R_s']
-        # c_n = read_csv(FP_SUM, skiprows=[0, 2], usecols=order, parse_dates=[[0, 1]], na_values=-9999) #todo
-        c_n = read_csv(C_N, usecols=order_c, parse_dates=[0], na_values=-9999)
-        c_n.set_index(c_n.columns[0], inplace=True)
-        c_n.columns = ['c_n']
-        c_s = read_csv(C_S, usecols=order_c, parse_dates=[0], na_values=-9999)
-        c_s.set_index(c_s.columns[0], inplace=True)
-        c_s.columns = ['c_s']
-        c_all = pd.merge(c_n, c_s, left_index=True, right_index=True, how='outer')
-        fc_all = pd.merge(fc_n, fc_s, left_index=True, right_index=True, how='outer')
-        sumup = pd.merge(fc_all, c_all, left_index=True, right_index=True, how='outer')
-        sumup.eval('Qn = (c_n -c_s)/Fc_n', inplace=True)
-        sumup.eval('Qs = (c_s -c_n)/Fc_s', inplace=True)
-        sumup.replace([np.inf, -np.inf], np.nan, inplace=True)
-        sumup.to_csv(SUM_UP)
-        # print(fc_n)
-        # print(c_all)
-        # print(c_s)
-        # print(c_n)
-        print(sumup)
-        """
+        self._load_data()
+
+    def _parse_config(self):
+        tsp_config = namedtuple('tsp_config', ['stat_dir',
+                                               'amd_path',
+                                               'plot_path',
+                                               'plot_settings'])
+        self.config = tsp_config(self._mod_config['meteorology_statistics_directory'],
+                                 self._mod_config['ammonia_data_path'],
+                                 self._mod_config['plot_path'],
+                                 self._mod_config['plot_settings'])
+
+    def _load_data(self):
+        result_path = get_path(target_dir=self.config.stat_dir,
+                               file_init='eddypro_ADV_essentials',
+                               file_ext='adv.csv')
+        useful_cols = ['date',
+                       'time',
+                       'wind_dir',
+                       'wind_speed',
+                       'H',
+                       't_air',
+                       'rh_air']
+        met_data = pd.read_csv(result_path,
+                               usecols=useful_cols,
+                               parse_dates=[[0, 1]],
+                               na_values=-9999)
+        met_data.set_index(met_data.columns[0], inplace=True)
+        am_data = pd.read_csv(self.config.amd_path, parse_dates=[0])
+        am_data.set_index(am_data.columns[0], inplace=True)
+        self.data = am_data.join(met_data)
+        self.data['T'] = self.data['t_air'] - 273.15
+        self.data.drop('t_air', axis=1)
+
+    def plot_windrose(self):
+        pass
+
+    def plot_hourly_box(self):
+        pass
+
+    def plot_summary(self):
+        fig_size = (30, 20)
+        multi_plot = plt.figure(figsize=fig_size, dpi=300)
+        plot_order = ['wind_speed', 'wind_dir', 'T', 'rh_air', 'H']
+        for sub_name in plot_order:
+            sub_plot = multi_plot.add_subplot(self._get_pos(sub_name, plot_order),
+                                              xlim=[self.data.index[0].date(), self.data.index[-1].date()],
+                                              ylim=self.config.plot_settings[sub_name]['ylim'])
+            plt.plot(self.data[sub_name], self.config.plot_settings[sub_name]['style'],
+                     **self.config.plot_settings[sub_name]['params'])
+
+            sub_plot.tick_params(axis='both', length=10, which='major', direction='in', labelsize=14)
+
+            sub_plot.xaxis.set_major_formatter(dates.DateFormatter('%m/%d'))
+            sub_plot.xaxis.set_major_locator(dates.DayLocator())
+            sub_plot.set_xlabel('Date', fontsize=18)
+
+            sub_plot.set_ylabel(self.config.plot_settings[sub_name]['label'], fontsize=18)
+            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self.config.plot_settings[sub_name]['y_ticks']))
+
+        # multi_plot.tight_layout()
+        os.makedirs(self.config.plot_path, exist_ok=True)
+        plt.savefig(self.config.plot_path + '\\all_ADV.png')
+        plt.close(multi_plot)
+
+    def plot_daily_ts(self):
+        data_range = pd.date_range(self.data.index[0].date(), self.data.index[-1].date() + datetime.timedelta(days=1))
+        daily_data = []
+        for n in range(len(data_range) - 1):
+            daily_data.append(self.data[data_range[n]:data_range[n + 1]])
+        for data in daily_data:
+            print(data.describe())
+            try:
+                self._plot_daily_ts(data)
+            except Exception as e:
+                print('err {}'.format(e))
+
+    @staticmethod
+    def _get_pos(sub: str, order: list):
+        return int("%s1%s" % (len(order), order.index(sub) + 1))  # e.g.312 means 2nd row of 3 in single column
+
+    def _plot_daily_ts(self, data):
+        fig_size = (14, 20)
+        multi_plot = plt.figure(figsize=fig_size, dpi=300)
+        plot_order = ['wind_speed', 'wind_dir', 't_air', 'rh_air', 'H']
+        for sub_name in plot_order:
+            sub_plot = multi_plot.add_subplot(self._get_pos(sub_name, plot_order),
+                                              xlim=[data.index[0].date(), data.index[-1].date()],
+                                              ylim=self.config.plot_settings[sub_name]['ylim'])
+            plt.plot(data[sub_name], self.config.plot_settings[sub_name]['style'],
+                     **self.config.plot_settings[sub_name]['params'])
+
+            sub_plot.tick_params(axis='both', length=10, which='major', direction='in', labelsize=14)
+            sub_plot.tick_params(axis='both', length=5, which='minor', direction='in', labelsize=14)
+
+            sub_plot.xaxis.set_major_formatter(dates.DateFormatter('%m/%d'))
+            sub_plot.xaxis.set_major_locator(dates.DayLocator())
+            sub_plot.xaxis.set_minor_locator(dates.HourLocator())
+            sub_plot.set_xlabel('Date', fontsize=18)
+
+            sub_plot.set_ylabel(self.config.plot_settings[sub_name]['label'], fontsize=18)
+            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self.config.plot_settings[sub_name]['y_ticks']))
+
+        # multi_plot.tight_layout()
+        os.makedirs(self.config.plot_path, exist_ok=True)
+        plt.savefig(self.config.plot_path + '\\' + str(data.index[0].date()) + 'ADV.png')
+        plt.close(multi_plot)

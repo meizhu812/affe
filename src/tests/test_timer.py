@@ -1,5 +1,5 @@
 from unittest import TestCase
-from core.util import Logger
+from util import Logger
 from time import sleep
 
 '''

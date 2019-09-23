@@ -1,7 +1,7 @@
 import numpy as np
 from math import log
 from scipy.special import gamma
-from modules.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
+from res.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
 
 
 footprint_grid = np.zeros((100, 100))

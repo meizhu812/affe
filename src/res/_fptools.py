@@ -1,7 +1,7 @@
 from pandas import DataFrame, read_csv
 import numpy as np
-from core.file import get_paths
-from core.frame import BaseProcessModule
+from file import get_paths
+from frame import BaseProcessModule
 from os import path
 from collections import namedtuple
 
