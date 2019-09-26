@@ -8,5 +8,5 @@ if __name__ == '__main__':
     #test_proj.prepare_raw_data()
     #test_proj.generate_turb_stats()
     #test_proj.generate_fp_grds()
-    test_proj.plot_timeseries()
+    test_proj.plot()
 

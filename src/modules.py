@@ -1,6 +1,7 @@
 import configparser
 import datetime
 import os
+import io
 import shutil
 import subprocess
 from collections import namedtuple
@@ -193,9 +194,11 @@ class EPProxy(BaseDataModule):
 
     def _parse_config(self):
         epp_config = namedtuple('epp_config',
-                                ['cli_path',
+                                ['rp_path',
+                                 'fcc_path',
                                  'prj_path'])
-        self.config = epp_config(self._mod_config['eddypro_cli_path'],
+        self.config = epp_config(self._mod_config['eddypro_rp_path'],
+                                 self._mod_config['eddypro_fcc_path'],
                                  self._mod_config['eddypro_project_path'])
 
     def modify_and_run(self):
@@ -218,20 +221,28 @@ class EPProxy(BaseDataModule):
     def _run_ep(self):
         @self._logger.log_action('Running EddyPro in background')
         def action():
-            process = subprocess.Popen([self.config.cli_path, self.config.prj_path], shell=True,
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p_rp = subprocess.Popen([self.config.rp_path, self.config.prj_path], shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             ep_pgb = ProgressBar(target=self.total_files)
-            rp_ended = False
 
             while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
-                output = process.stdout.readline().decode('utf8').strip()
+                output = p_rp.stdout.readline().decode('utf8').strip()
                 if output.startswith('From:'):
                     ep_pgb.update()
-                elif output.startswith('Raw moduless processing terminated.'):
-                    rp_ended = True
-                elif output.startswith('Done.') and rp_ended:
-                    process.terminate()  # manually kill the subprocess
+
+                elif output.startswith('Note'):
+                    p_rp.terminate()  # manually kill the subprocess
                     break
+            print('rp ended, begin fcc')
+            p_fcc = subprocess.Popen([self.config.fcc_path, self.config.prj_path], shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+            while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
+                output = p_fcc.stdout.readline().decode('utf8').strip()
+                if output.startswith('Note'):
+                    p_fcc.terminate()  # manually kill the subprocess
+                    break
+            print('fcc ended')
 
         action()
 
@@ -266,7 +277,6 @@ class FpGrdGenerator(BaseDataModule):
         @self._logger.log_process('Generate Footprint Grid Files')
         def process():
             self._initialize_fp_model()
-            self._run_fp_model()
 
         process()
 
@@ -332,6 +342,10 @@ class FpGrdGeneratorClassic(FpGrdGenerator):
         flux_out.columns = out_cols
         self.total = len(flux_out)
         seg = self.total // self.n_cores + 1
+        flux_out.to_csv(self.config.fpout_dir + '\\02metdata.dat', date_format='%y%m%d%H%M',
+                        index_label='Datetime',
+                        sep='\t',
+                        float_format='%.3f')
         for n in range(self.n_cores):
             nth_out = flux_out.iloc[n * seg: (n + 1) * seg]
             nth_out.to_csv(self.out_dirs[n] + '\\02metdata.dat',
@@ -368,7 +382,7 @@ class FpGrdGeneratorClassic(FpGrdGenerator):
                 grd_files = get_paths(target_dir=out_dir, file_ext='.grd')
                 for grd_file in grd_files:  # move all .grd files
                     file_dir, file_name = os.path.split(grd_file)
-                    shutil.copy(grd_file, os.path.join(self.config.fpout_dir, file_name))
+                    shutil.move(grd_file, os.path.join(self.config.fpout_dir, file_name))
                 shutil.rmtree(out_dir)  # remove all sub-folders and containing temp files
 
         action()
@@ -444,7 +458,16 @@ class Plotter(BaseDataModule):
         pass
 
     def plot_hourly_box(self):
-        pass
+        plot_order = ['wind_speed', 'wind_dir', 'T', 'H']
+        hours = list(range(24))
+        hourly_data = self.data.resample('H').mean()
+        hourly_data['hour'] = hourly_data.index.hour
+        for plot_item in plot_order:
+            plot_data = {}
+            for hour in hours:
+                plot_data[hour] = list(pd.Series(hourly_data[hourly_data['hour'] == hour][plot_item]).values)
+            plot_data = pd.DataFrame.from_dict(plot_data, orient='index').transpose()
+            print(plot_data)
 
     def plot_summary(self):
         fig_size = (30, 20)
@@ -490,7 +513,7 @@ class Plotter(BaseDataModule):
     def _plot_daily_ts(self, data):
         fig_size = (14, 20)
         multi_plot = plt.figure(figsize=fig_size, dpi=300)
-        plot_order = ['wind_speed', 'wind_dir', 't_air', 'rh_air', 'H']
+        plot_order = ['wind_speed', 'wind_dir', 'T', 'rh_air', 'H']
         for sub_name in plot_order:
             sub_plot = multi_plot.add_subplot(self._get_pos(sub_name, plot_order),
                                               xlim=[data.index[0].date(), data.index[-1].date()],
@@ -513,3 +536,15 @@ class Plotter(BaseDataModule):
         os.makedirs(self.config.plot_path, exist_ok=True)
         plt.savefig(self.config.plot_path + '\\' + str(data.index[0].date()) + 'ADV.png')
         plt.close(multi_plot)
+
+
+class FluxEstimator(BaseDataModule):
+    def _parse_config(self):
+        fe_config = namedtuple('fe_config', ['fc_N_path',
+                                             'C_N_path',
+                                             'fc_S_path',
+                                             'C_S_path'])
+        self.config = fe_config(self._mod_config['north_fcsum_file_path'],
+                                self._mod_config['north_conc_file_path'],
+                                self._mod_config['south_fcsum_file_path'],
+                                self._mod_config['south_conc_file_path'])

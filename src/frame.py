@@ -50,6 +50,11 @@ class Project:
         ammonia_raw_prep.load_raw_data()
         ammonia_raw_prep.prepare_ammonia_data()
 
+    def prepare_ammonia_data(self):
+        ammonia_raw_prep = AmmoniaRawConverter(self.prj_conf, self.arc_conf, self.logger)
+        ammonia_raw_prep.load_raw_data()
+        ammonia_raw_prep.prepare_ammonia_data()
+
     def generate_turb_stats(self):
         ep_proxy = EPProxy(self.prj_conf, self.epp_conf, self.logger)
         ep_proxy.modify_and_run()
@@ -63,8 +68,12 @@ class Project:
         else:
             raise ValueError('Invalid method type')
 
-    def plot_timeseries(self):
+    def plot(self):
         ts_plotter = Plotter(self.prj_conf, self.tsp_conf, self.logger)
-        ts_plotter.plot_summary()
+        # ts_plotter.plot_summary()
+        # ts_plotter.plot_daily_ts()
+        ts_plotter.plot_hourly_box()
+
+
 
 
