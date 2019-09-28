@@ -395,20 +395,7 @@ class FpGrdProcessor(BaseDataModule):
     def _parse_config(self):
         pass
 
-    @staticmethod
-    def _get_grd_data(grd_path):
-        with open(grd_path, 'r') as f:
-            heads = []  # first 5 lines of grd file
-            for n in range(5):
-                heads.append(f.readline())
-            nx, ny = map(int, heads[1].split())
-            data_fracs = []
-            while True:
-                line = f.readline()
-                if not line:  # end of file
-                    break
-                data_fracs.append(np.fromstring(line, sep=' ', dtype='f4'))
-        return np.concatenate(data_fracs).reshape(nx, ny)
+
 
     @staticmethod
     def _plot_grd(grd_data, grd_path):

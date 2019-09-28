@@ -2,7 +2,6 @@ from util import Logger
 from modules import SonicRawConverter, AmmoniaRawConverter, EPProxy, FpGrdGeneratorClassic, Plotter
 import json
 
-
 class Project:
 
     def __init__(self):

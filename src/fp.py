@@ -9,6 +9,20 @@ n_x = n_y = 0
 x_max = y_max = f_max = 0
 
 
+def read_grd_data(grd_path):
+    with open(grd_path, 'r') as f:
+        heads = []  # first 5 lines of grd file
+        for n in range(5):
+            heads.append(f.readline())
+        nx, ny = map(int, heads[1].split())
+        data_fracs = []
+        while True:
+            line = f.readline()
+            if not line:  # end of file
+                break
+            data_fracs.append(np.fromstring(line, sep=' ', dtype='f4'))
+    return np.concatenate(data_fracs).reshape(nx, ny)
+
 class FPCalculator:
     def calc_fp(self, z_m, z_0, date_time, wind_dir, wind_spd, sigma_v, u_star, L, h_s, rho_air):
         if abs(L) < z_0:

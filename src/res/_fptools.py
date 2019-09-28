@@ -1,60 +1,62 @@
-from pandas import DataFrame, read_csv
-import numpy as np
-from file import get_paths
-from frame import BaseProcessModule
-from os import path
+import file
+from modules import BaseDataModule
+import os
 from collections import namedtuple
+import pandas as pd
+import numpy as np
 
 
-class GRDAnalyzer(BaseProcessModule):
+class GRDAnalyzer(BaseDataModule):
 
     def _parse_config(self):
-        grd_config = namedtuple('grd_config', ['grd_dir'])
-        self._config = grd_config(self._mod_config['raw_files_directory'])
+        grd_config = namedtuple('grd_config', ['grd_dir', 'gl_dir'])
+        self.config = grd_config(self._mod_config['grd_files_directory'],
+                                 self._mod_config['group_lists_directory'])
 
     def _group_by_custom(self):
-        pass
-
+        custom_groups = {}
+        group_lists = file.get_paths(target_dir=self.config.gl_dir, file_ext='.txt')  #
+        for group_list in group_lists:
+            group_code = os.path.split(group_list)[-1]
+            custom_groups[group_code] = []
+            with open(group_list, 'r') as gl:
+                for group_member_name in gl:
+                    group_member_path = file.get_path(target_dir=self.grd_paths, file_init=group_member_name)
+                    custom_groups[group_code].append(group_member_path)
+        return custom_groups
     def _group_by_hour(self):
         hour_groups = {'{:0>2d}'.format(int(b)): [] for b in list(np.linspace(0, 23, 24))}  # from '00' to '23'
         for grd_path in self.grd_paths:
-            grd_name = path.splitext(path.split(grd_path)[1])[0]
+            grd_name = os.path.splitext(os.path.split(grd_path)[1])[0]
             hour_code = grd_name[6:8]
             hour_groups[hour_code].append(grd_path)
         return hour_groups
 
     def _get_grd_paths(self):
-        self.grd_paths = get_paths(target_dir=self._config.grd_dir, file_ext='.grd')
+        self.grd_paths = file.get_paths(target_dir=self.config.grd_dir, file_ext='.grd')
 
-    def group_by_day(self):
-        pass
-
-
-class GrGrouper:
-    def __init__(self):
-        self.grd
-
-
-def grid_file_grouping(grid_files: list, key_name: str, key_loc: slice, grid_groups: dict):
-    for grid_file in grid_files:
-        grid_file[key_name] = grid_file['path'].split('\\')[-1][key_loc]  # TODO
-        for grid_group in grid_groups:
-            if not grid_file[key_name] in grid_group:
-                grid_groups[grid_file[key_name]] = []  # create new group
-            grid_groups[grid_file[key_name]].append(grid_file['path'])
-    return grid_groups
+    def _group_by_day(self):
+        day_groups = {}
+        for grd_path in self.grd_paths:
+            grd_name = os.path.splitext(os.path.split(grd_path)[1])[0]
+            day_code = grd_name[0:6]
+            if day_code in day_groups:
+                day_groups[day_code].append(grd_path)
+            else:
+                day_groups[day_code] = [grd_path]  # create new day key
+        return day_groups
 
 
 def grid_average(grid_groups, output_dir: str):
     for grid_group in grid_groups:
-        average_grid = DataFrame
+        average_grid = pd.DataFrame()
         i = 0
         for grid_file in grid_groups[grid_group]:
             if i == 0:
-                average_grid = read_csv(grid_file, skiprows=[0, 1, 2, 3, 4], sep='\s+', header=None, index_col=False)
+                average_grid = pd.read_csv(grid_file, skiprows=list(range(4)), sep='\s+', header=None, index_col=False)
             else:
-                average_grid += read_csv(grid_file, skiprows=[0, 1, 2, 3, 4], sep='\s+', header=None,
-                                         index_col=False)
+                average_grid += pd.read_csv(grid_file, skiprows=list(range(4)), sep='\s+', header=None,
+                                            index_col=False)
             i += 1
         average_grid /= i
         os.makedirs(output_dir, exist_ok=True)
