@@ -32,35 +32,23 @@ class EPProxy(BaseModule):
 
     @logger.log_action('Running EddyPro in background')
     def _run_ep(self):
-        p_rp = subprocess.Popen([os.path.join(self._bin_dir,'eddypro_rp.exe'), self._epc_path], shell=True,
+        p_rp = subprocess.Popen([os.path.join(self._bin_dir, 'eddypro_rp.exe'), self._epc_path], shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         ep_pgb = ProgressBar(target=self.total_files)
-        if self._keep_logs:
-            f_rp = open('rp_log.log','w')
-            f_fcc = open('fcc_log.log','w')
         while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
             output = p_rp.stdout.readline().decode('utf8').strip()
-            if self._keep_logs:
-                f_rp.write(output+'\n')
-            if output.startswith('From:'):
+            if output.startswith('Re-calculating'):  # indicates valid time period
                 ep_pgb.update()
-
             elif output.startswith('Note'):
                 p_rp.terminate()  # manually kill the subprocess
                 break
         print('rp ended, begin fcc')
-        p_fcc = subprocess.Popen([os.path.join(self._bin_dir,'eddypro_fcc.exe'), self._epc_path], shell=True,
+        p_fcc = subprocess.Popen([os.path.join(self._bin_dir, 'eddypro_fcc.exe'), self._epc_path], shell=True,
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
             output = p_fcc.stdout.readline().decode('utf8').strip()
-            if self._keep_logs:
-                f_fcc.write(output+'\n')
             if output.startswith('Note'):
                 p_fcc.terminate()  # manually kill the subprocess
                 break
         print('fcc ended')
-        if self._keep_logs:
-            f_rp.close()
-            f_fcc.close()
-
