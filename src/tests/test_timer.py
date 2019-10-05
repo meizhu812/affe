@@ -1,5 +1,5 @@
 from unittest import TestCase
-from util import Logger
+from util.logger import ConsoleLogger
 from time import sleep
 
 '''
@@ -43,7 +43,7 @@ class TestTimer(TestCase):
 
 class TestLogger(TestCase):
     def setUp(self) -> None:
-        self.logger = Logger()
+        self.logger = ConsoleLogger()
 
     def _manual_process(self):
         @self.logger.log_process('Manual Process', timed=False)

@@ -1,7 +1,9 @@
 import numpy as np
 from math import log
 from scipy.special import gamma
-from res.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
+# from res.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
+
+
 
 
 footprint_grid = np.zeros((100, 100))
@@ -83,7 +85,7 @@ def read_site_conf(site_param_path, site_locs_path):
 
 
 
-    if __name__ == '__main__':
-        read_met_data(
-            r'D:\Truman\Desktop\present_work\01_ammonia\00_general\03_tools\footprint\footprint\01\02metdata.dat')
-        read_site_conf('01paras.dat', '')
+    # if __name__ == '__main__':
+    #     read_met_data(
+    #         r'D:\Truman\Desktop\present_work\01_ammonia\00_general\03_tools\footprint\footprint\01\02metdata.dat')
+    #     read_site_conf('01paras.dat', '')

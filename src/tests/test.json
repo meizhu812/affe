@@ -1,6 +1,6 @@
 {
   "project_config":{
-    "alias":"test_project",
+    "project name":"test_project",
     "path":"D:\\Truman\\Temp\\test_project\\North",
     "raw_sub":"01RawData",
     "prep_sub":"02PreparedData",
@@ -18,9 +18,7 @@
         "usecols":[0,2,3,4,5,6,7,8,9,10,11,12,13],
         "na_values":"NAN",
         "parse_dates":[0]
-      },
-      "raw_pattern":{"file_init":"TOA5_8329.ts","file_ext":".dat"}
-    },
+
     "ammonia":{
       "alias":"Ammonia",
       "raw_format":{

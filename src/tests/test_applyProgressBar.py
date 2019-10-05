@@ -1,5 +1,5 @@
 from unittest import TestCase
-from util import ProgressBar
+from util.pgbar import ProgressBar
 from multiprocessing import Pool, freeze_support
 from time import sleep
 

@@ -1,68 +1,4 @@
 {
-  "project_config": {
-    "alias": "test_project",
-    "prep_sub": "02PreparedData",
-    "analyses_sub": "03Analyses",
-    "fc_path": "",
-    "ep_path": "",
-    "physical_cores_available": 4
-  },
-  "sonic_raw_convert_config": {
-    "alias": "Sonic",
-    "raw_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\01RawData\\Sonic",
-    "converted_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\02ConvertedData\\Sonic",
-    "raw_data_format": {
-      "header": 0,
-      "skiprows": [0, 2, 3],
-      "usecols": [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-      "na_values": "NAN",
-      "parse_dates": [0]
-    },
-    "raw_filenames_pattern": {
-      "file_init": "TOA5_12389.ts",
-      "file_ext": ".dat"
-    },
-    "data_periods_parameters": {
-      "start": "2018-05-31 16:30:00",
-      "end": "2018-07-02 08:30:00",
-      "freq": "15T"
-    }
-  },
-  "ammonia_raw_convert_config": {
-    "alias": "Ammonia",
-    "raw_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\01RawData\\Ammonia",
-    "converted_files_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\02ConvertedData\\Ammonia",
-    "raw_data_format": {
-      "sep": "\\s+",
-      "usecols": [0, 1, 17, 21],
-      "parse_dates": [[0, 1]]
-    },
-    "raw_filenames_pattern": {
-      "file_init": "AEDS2026",
-      "file_ext": ".dat"
-    },
-    "data_periods_parameters": {
-      "start": "2018-05-31 16:30:00",
-      "end": "2018-07-02 08:30:00",
-      "freq": "15T"
-    }
-  },
-  "eddypro_proxy_config": {
-    "eddypro_cli_path": "C:\\Users\\mz\\Documents\\test_proj\\bin\\eddypro_rp.exe",
-    "eddypro_project_path": "C:\\Users\\mz\\Documents\\test_proj\\EPFile\\2018SN.eddypro"
-  },
-  "fp_model_executor_config": {
-    "footprint_output_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\04FootprintData",
-    "eddypro_results_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\03EPOutput",
-    "footprint_model_cli_path": "C:\\Users\\mz\\Documents\\test_proj\\bin\\cftp.exe",
-    "measure_height": 8.2,
-    "roughness_height": 0.01,
-    "x_range": 750,
-    "y_range": 750,
-    "grid_size": 5,
-    "station_x": 0.240,
-    "station_y": 0.545
-  },
   "timeseries_plotter_config": {
     "meteorology_statistics_directory": "C:\\Users\\mz\\Documents\\test_proj\\North\\03EPOutput",
     "ammonia_data_path": "C:\\Users\\mz\\Documents\\test_proj\\North\\02ConvertedData\\Ammonia\\data_averaged.csv",
@@ -89,14 +25,14 @@
         "style": "g-",
         "ylim": [0, 45],
         "params": {},
-        "y_ticks": [0, 10, 20,30, 40]
+        "y_ticks": [0, 10, 20, 30, 40]
       },
       "rh_air": {
         "label": "relative humidity\n%",
         "style": "g-",
         "ylim": [0, 105],
         "params": {},
-        "y_ticks": [0, 20, 40,60,80,100]
+        "y_ticks": [0, 20, 40, 60, 80, 100]
       },
       "H": {
         "label": "sensible heat\n$[W/m^2]$",
