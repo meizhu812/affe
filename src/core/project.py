@@ -61,7 +61,7 @@ class Project:
             sys.exit(1)
         if method == 'classic':
             fp_init = FpGrdGeneratorClassic(self.prj_conf, self.fme_conf, self.logger)
-            fp_init.initialize_and_run()
+            fp_init.generate_footprint_grids()
         elif method == 'new':
             pass  # TODO
         else:
