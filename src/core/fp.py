@@ -1,11 +1,31 @@
+from collections import namedtuple
+
 import numpy as np
 from math import log
 from scipy.special import gamma
 # from res.functions import func_phi_m, func_phi_c, func_psi_m, const_kar
+from core.base import BaseModule
+from util.logger import logger
+
+
+class FpGrdGenerator(BaseModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _parse_config(self):
+        prj_conf = self._config['Project']
+        self._p_cores = int(prj_conf['CPU_Cores'])
+        self._io_threads = self._p_cores * 2  # seems reasonable
+        fpg_conf = self._config['Footprint']
+        self._epr_dir = fpg_conf['Eddy_Pro_Results_Directory']
+        self._fpout_dir = fpg_conf['Footprint_Data_Output_Directory']
+
+    def generate_footprint_grids(self):
+        raise NotImplementedError
 
 
 
-
+"""
 footprint_grid = np.zeros((100, 100))
 n_x = n_y = 0
 x_max = y_max = f_max = 0
@@ -89,3 +109,4 @@ def read_site_conf(site_param_path, site_locs_path):
     #     read_met_data(
     #         r'D:\Truman\Desktop\present_work\01_ammonia\00_general\03_tools\footprint\footprint\01\02metdata.dat')
     #     read_site_conf('01paras.dat', '')
+"""

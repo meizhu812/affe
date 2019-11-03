@@ -9,9 +9,8 @@ class BaseData:
 
 
 class BaseModule:
-    def __init__(self, config: ConfigParser, logger: ConsoleLogger):
+    def __init__(self, *, config: ConfigParser):
         self._config = config
-        self._logger = logger
         self._parse_config()
 
     def _parse_config(self):

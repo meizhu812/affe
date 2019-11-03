@@ -35,7 +35,7 @@ class EPProxy(BaseModule):
         p_rp = subprocess.Popen([os.path.join(self._bin_dir, 'eddypro_rp.exe'), self._epc_path], shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         ep_pgb = ProgressBar(target=self.total_files)
-        while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
+        while True:  # the program does not quit with a return code, instead it outputs an err/warning and hangs
             output = p_rp.stdout.readline().decode('utf8').strip()
             if output.startswith('Re-calculating'):  # indicates valid time period
                 ep_pgb.update()
@@ -46,7 +46,7 @@ class EPProxy(BaseModule):
         p_fcc = subprocess.Popen([os.path.join(self._bin_dir, 'eddypro_fcc.exe'), self._epc_path], shell=True,
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-        while True:  # the program does not quit and return a code, instead it outputs an err/warning and hangs
+        while True:  # the program does not quit with a return code, instead it outputs an err/warning and hangs
             output = p_fcc.stdout.readline().decode('utf8').strip()
             if output.startswith('Note'):
                 p_fcc.terminate()  # manually kill the subprocess
