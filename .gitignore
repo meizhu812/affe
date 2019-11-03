@@ -136,3 +136,4 @@ dmypy.json
 /src/tests/
 /src/projects/
 /src/res/
+/src/nbs/

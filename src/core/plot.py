@@ -1,5 +1,7 @@
 import datetime
+import json
 import os
+import sys
 from collections import namedtuple
 
 import pandas as pd
@@ -9,24 +11,26 @@ from core.base import BaseModule
 from core.file import get_path
 
 
-class Plotter(BaseModule):
+class TimeSeriesPlotter(BaseModule):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self._load_data()
 
     def _parse_config(self):
-        tsp_config = namedtuple('tsp_config', ['stat_dir',
-                                               'amd_path',
-                                               'plot_path',
-                                               'plot_settings'])
-        self.config = tsp_config(self._mod_config['meteorology_statistics_directory'],
-                                 self._mod_config['ammonia_data_path'],
-                                 self._mod_config['plot_path'],
-                                 self._mod_config['plot_settings'])
+
+        tsp_config = self._config['TimeSeries_Plot']
+        self._pdd = tsp_config['Plot_Data_Directory']
+        self._pod = tsp_config['Plots_Output_Directory']
+        try:
+            with open(tsp_config['Plot_Configurations_Path']) as pcs:
+                self._pcs = json.load(pcs)['plot_settings']
+        except Exception as e:
+            print(e)
+            sys.exit(1)
 
     def _load_data(self):
-        result_path = get_path(target_dir=self.config.stat_dir,
+        result_path = get_path(target_dir=self._pdd,
                                file_init='eddypro_ADV_essentials',
                                file_ext='adv.csv')
         useful_cols = ['date',
@@ -41,9 +45,10 @@ class Plotter(BaseModule):
                                parse_dates=[[0, 1]],
                                na_values=-9999)
         met_data.set_index(met_data.columns[0], inplace=True)
-        am_data = pd.read_csv(self.config.amd_path, parse_dates=[0])
-        am_data.set_index(am_data.columns[0], inplace=True)
-        self.data = am_data.join(met_data)
+        # am_data = pd.read_csv(self.config.amd_path, parse_dates=[0])
+        # am_data.set_index(am_data.columns[0], inplace=True)
+        # self.data = am_data.join(met_data)
+        self.data = met_data
         self.data['T'] = self.data['t_air'] - 273.15
         self.data.drop('t_air', axis=1)
 
@@ -69,9 +74,9 @@ class Plotter(BaseModule):
         for sub_name in plot_order:
             sub_plot = multi_plot.add_subplot(self._get_pos(sub_name, plot_order),
                                               xlim=[self.data.index[0].date(), self.data.index[-1].date()],
-                                              ylim=self.config.plot_settings[sub_name]['ylim'])
-            plt.plot(self.data[sub_name], self.config.plot_settings[sub_name]['style'],
-                     **self.config.plot_settings[sub_name]['params'])
+                                              ylim=self._pcs[sub_name]['ylim'])
+            plt.plot(self.data[sub_name], self._pcs[sub_name]['style'],
+                     **self._pcs[sub_name]['params'])
 
             sub_plot.tick_params(axis='both', length=10, which='major', direction='in', labelsize=14)
 
@@ -79,12 +84,12 @@ class Plotter(BaseModule):
             sub_plot.xaxis.set_major_locator(dates.DayLocator())
             sub_plot.set_xlabel('Date', fontsize=18)
 
-            sub_plot.set_ylabel(self.config.plot_settings[sub_name]['label'], fontsize=18)
-            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self.config.plot_settings[sub_name]['y_ticks']))
+            sub_plot.set_ylabel(self._pcs[sub_name]['label'], fontsize=18)
+            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self._pcs[sub_name]['y_ticks']))
 
         # multi_plot.tight_layout()
-        os.makedirs(self.config.plot_path, exist_ok=True)
-        plt.savefig(self.config.plot_path + '\\all_ADV.png')
+        os.makedirs(self._pod, exist_ok=True)
+        plt.savefig(self._pod + '\\all_ADV.png')
         plt.close(multi_plot)
 
     def plot_daily_ts(self):
@@ -110,9 +115,9 @@ class Plotter(BaseModule):
         for sub_name in plot_order:
             sub_plot = multi_plot.add_subplot(self._get_pos(sub_name, plot_order),
                                               xlim=[data.index[0].date(), data.index[-1].date()],
-                                              ylim=self.config.plot_settings[sub_name]['ylim'])
-            plt.plot(data[sub_name], self.config.plot_settings[sub_name]['style'],
-                     **self.config.plot_settings[sub_name]['params'])
+                                              ylim=self._pcs[sub_name]['ylim'])
+            plt.plot(data[sub_name], self._pcs[sub_name]['style'],
+                     **self._pcs[sub_name]['params'])
 
             sub_plot.tick_params(axis='both', length=10, which='major', direction='in', labelsize=14)
             sub_plot.tick_params(axis='both', length=5, which='minor', direction='in', labelsize=14)
@@ -122,10 +127,10 @@ class Plotter(BaseModule):
             sub_plot.xaxis.set_minor_locator(dates.HourLocator())
             sub_plot.set_xlabel('Date', fontsize=18)
 
-            sub_plot.set_ylabel(self.config.plot_settings[sub_name]['label'], fontsize=18)
-            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self.config.plot_settings[sub_name]['y_ticks']))
+            sub_plot.set_ylabel(self._pcs[sub_name]['label'], fontsize=18)
+            sub_plot.yaxis.set_major_locator(plt.FixedLocator(self._pcs[sub_name]['y_ticks']))
 
         # multi_plot.tight_layout()
-        os.makedirs(self.config.plot_path, exist_ok=True)
-        plt.savefig(self.config.plot_path + '\\' + str(data.index[0].date()) + 'ADV.png')
+        os.makedirs(self._pod, exist_ok=True)
+        plt.savefig(self._pod + '\\' + str(data.index[0].date()) + 'ADV.png')
         plt.close(multi_plot)
